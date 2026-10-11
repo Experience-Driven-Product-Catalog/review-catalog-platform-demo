@@ -78,6 +78,10 @@ def test_search_never_relaxes_and_unknown_stays_unknown():
     assert result["matched_count"] == 0 and result["products"] == []
     assert result["applied_conditions"]
     assert tools.invoke("search_products", {})["matched_count"] == 9
+    unknown = tools.invoke("search_products", {"require_features": ["hdr10"]})
+    assert any(
+        p["product_id"] == "aoc-q27g2s" for p in unknown["excluded_due_to_unknown_data"]
+    )
     with pytest.raises(ValueError):
         tools.invoke("search_products", {"made_up_filter": True})
 

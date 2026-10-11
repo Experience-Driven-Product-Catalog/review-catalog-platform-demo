@@ -434,7 +434,7 @@ def render(report):
                 pos = m["positive_alternative"]
                 bad = m["undesired"]
                 lines.append(
-                    f"  - {esc(m['aspect'])}: '{esc(m['status'])}' 관련 리뷰 {bad['support'] if bad else 0}개 (부정 {bad['counts']['negative'] if bad else 0}개); 다른 긍정 상태 {esc(pos['status']) if pos else '근거 없음'}"
+                    f"  - {esc(m['aspect'])}: '{esc(m['status'])}' 관련 리뷰 {bad['support'] if bad else 0}개 (부정 {bad['counts']['negative'] if bad else 0}개); 다른 긍정 상태 {('‘' + esc(pos['status']) + '’ (긍정 ' + str(pos['counts']['positive']) + '개 / 관련 ' + str(pos['support']) + '개)') if pos else '근거 없음'}"
                 )
 
     add_alternatives("## 입력한 불편에 대한 대안", report["alternatives"])
