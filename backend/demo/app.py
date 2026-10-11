@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from openai import APIError
 from pydantic import BaseModel, ConfigDict, Field
 
-from . import agent, catalog
+from . import agent, audit, catalog
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.add_middleware(
@@ -131,7 +131,7 @@ def response(factory, body, service):
     if os.environ.get("SERVICE", "local") not in ("local", service):
         return JSONResponse({"error": "NOT_FOUND"}, status_code=404)
     return StreamingResponse(
-        stream(factory, body),
+        stream(lambda request: audit.events(service, request, factory), body),
         media_type="text/event-stream",
         headers={"X-Accel-Buffering": "no", "Cache-Control": "no-store"},
     )

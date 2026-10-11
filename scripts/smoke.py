@@ -90,5 +90,5 @@ else:
             },
         )
     )
-    assert report["policy"]["stored"] is False and report["overview"]["aspects"]
+    assert report["policy"]["stored"] is True and report["overview"]["aspects"]
     print("Live two-turn chat and unified report: PASS")

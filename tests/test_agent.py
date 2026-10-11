@@ -135,7 +135,10 @@ def test_report_extraction_is_not_stored(monkeypatch):
         )
 
 
-def test_api_without_key_is_explicit_and_validates_inputs():
+def test_api_without_key_is_explicit_and_validates_inputs(monkeypatch):
+    from demo import audit
+
+    monkeypatch.setattr(audit, "put", lambda *args: None)
     client = TestClient(app)
     assert client.get("/catalog").json()["api_ready"] is False
     r = client.post("/chat", json={"message": "안녕"})

@@ -5,7 +5,75 @@ def template(bucket, code_key, catalog_key, catalog_sha, code_sha, origin):
     sub = lambda s: {"Fn::Sub": s}
     ref = lambda s: {"Ref": s}
     get = lambda s, a: {"Fn::GetAtt": [s, a]}
-    resources = {}
+    resources = {
+        "AuditBucket": {
+            "Type": "AWS::S3::Bucket",
+            "DeletionPolicy": "Retain",
+            "UpdateReplacePolicy": "Retain",
+            "Properties": {
+                "BucketName": sub(
+                    "review-catalog-demo-audit-${AWS::AccountId}-${AWS::Region}"
+                ),
+                "PublicAccessBlockConfiguration": {
+                    "BlockPublicAcls": True,
+                    "IgnorePublicAcls": True,
+                    "BlockPublicPolicy": True,
+                    "RestrictPublicBuckets": True,
+                },
+                "OwnershipControls": {
+                    "Rules": [{"ObjectOwnership": "BucketOwnerEnforced"}]
+                },
+                "BucketEncryption": {
+                    "ServerSideEncryptionConfiguration": [
+                        {"ServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}
+                    ]
+                },
+                "LifecycleConfiguration": {
+                    "Rules": [
+                        {
+                            "Id": "ExpireAuditAfter90Days",
+                            "Status": "Enabled",
+                            "Prefix": "audit/",
+                            "ExpirationInDays": 90,
+                            "AbortIncompleteMultipartUpload": {
+                                "DaysAfterInitiation": 1
+                            },
+                        }
+                    ]
+                },
+            },
+        },
+        "AuditBucketPolicy": {
+            "Type": "AWS::S3::BucketPolicy",
+            "Properties": {
+                "Bucket": ref("AuditBucket"),
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "DenyInsecureTransport",
+                            "Effect": "Deny",
+                            "Principal": "*",
+                            "Action": "s3:*",
+                            "Resource": [
+                                get("AuditBucket", "Arn"),
+                                sub("${AuditBucket.Arn}/*"),
+                            ],
+                            "Condition": {"Bool": {"aws:SecureTransport": "false"}},
+                        },
+                        {
+                            "Sid": "RequireCreateOnlyWrites",
+                            "Effect": "Deny",
+                            "Principal": "*",
+                            "Action": "s3:PutObject",
+                            "Resource": sub("${AuditBucket.Arn}/audit/*"),
+                            "Condition": {"Null": {"s3:if-none-match": "true"}},
+                        },
+                    ],
+                },
+            },
+        },
+    }
     for kind in ["Report", "Chat"]:
         name = "review-catalog-platform-demo-" + kind.lower()
         resources[kind + "Log"] = {
@@ -27,10 +95,19 @@ def template(bucket, code_key, catalog_key, catalog_sha, code_sha, origin):
                 },
                 "Policies": [
                     {
-                        "PolicyName": "ReadCatalogAndRuntimeLogs",
+                        "PolicyName": "CatalogAuditAndRuntimeLogs",
                         "PolicyDocument": {
                             "Version": "2012-10-17",
                             "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": ["s3:PutObject"],
+                                    "Resource": sub(
+                                        "${AuditBucket.Arn}/audit/v1/"
+                                        + kind.lower()
+                                        + "/*"
+                                    ),
+                                },
                                 {
                                     "Effect": "Allow",
                                     "Action": ["s3:GetObject"],
@@ -69,6 +146,7 @@ def template(bucket, code_key, catalog_key, catalog_sha, code_sha, origin):
                 "Environment": {
                     "Variables": {
                         "SERVICE": kind.lower(),
+                        "AUDIT_BUCKET": ref("AuditBucket"),
                         "AWS_LAMBDA_EXEC_WRAPPER": "/opt/bootstrap",
                         "AWS_LWA_INVOKE_MODE": "response_stream",
                         "AWS_LWA_READINESS_CHECK_PATH": "/health",
@@ -222,7 +300,7 @@ def template(bucket, code_key, catalog_key, catalog_sha, code_sha, origin):
     }
     return {
         "AWSTemplateFormatVersion": "2010-09-09",
-        "Description": "Read-only fixed monitor demo; no EC2, no database server, no user persistence.",
+        "Description": "Fixed monitor catalog with private 90-day S3 security records; no EC2 or database server.",
         "Parameters": {
             "OpenAIKey": {"Type": "String", "NoEcho": True},
             "SessionSecret": {"Type": "String", "NoEcho": True},
@@ -235,6 +313,7 @@ def template(bucket, code_key, catalog_key, catalog_sha, code_sha, origin):
                 )
             },
             "CatalogBucket": {"Value": bucket},
+            "AuditBucket": {"Value": ref("AuditBucket")},
             "ReportFunction": {"Value": ref("ReportFunction")},
             "ChatFunction": {"Value": ref("ChatFunction")},
         },
