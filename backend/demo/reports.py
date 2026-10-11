@@ -81,18 +81,18 @@ def base():
                     }
                 )
             result[key] = {
-                "aspect": first["aspect"],
-                "status": first["status"] if len(fields) > 1 else None,
-                "aspect_id": first["aspect_cluster_id"],
-                "status_id": first["status_cluster_id"] if len(fields) > 1 else None,
+                "aspect": first["raw_aspect"],
+                "status": first["raw_status"] if len(fields) > 1 else None,
+                "aspect_id": first["raw_aspect_id"],
+                "status_id": first["state_variant_id"] if len(fields) > 1 else None,
                 **stats,
                 "mention_rate": stats["support"] / products[key[0]]["review_count"],
                 "evidence": evidence,
             }
         return result
 
-    aspects = aggregate(("aspect_cluster_id",))
-    pairs = aggregate(("aspect_cluster_id", "status_cluster_id"))
+    aspects = aggregate(("raw_aspect_id",))
+    pairs = aggregate(("raw_aspect_id", "state_variant_id"))
     aspect_ids = sorted({k[1] for k in aspects})
     priors = {}
     for aid in aspect_ids:
@@ -141,11 +141,13 @@ def normalize(units):
         item = dict(unit)
         aid = None
         sid = None
+        raw_aid = None
+        raw_sid = None
         aspect = None
         status = None
         raw = unicodedata.normalize("NFC", unit["raw_aspect"])
         candidates = catalog.rows(
-            "SELECT DISTINCT a.aspect_cluster_id,a.aspect FROM aspect_variants v JOIN aspects a USING(aspect_cluster_id) WHERE v.raw_aspect=?",
+            "SELECT DISTINCT v.raw_aspect_id,a.aspect_cluster_id,a.aspect FROM aspect_variants v JOIN aspects a USING(aspect_cluster_id) WHERE v.raw_aspect=?",
             (raw,),
         )
         state = "unresolved_aspect"
@@ -153,20 +155,24 @@ def normalize(units):
             state = "excluded"
         elif len(candidates) == 1:
             aid = candidates[0]["aspect_cluster_id"]
+            raw_aid = candidates[0]["raw_aspect_id"]
             aspect = candidates[0]["aspect"]
             state = (
                 "mapped_exact" if unit["raw_status"] is None else "unresolved_status"
             )
             if unit["raw_status"] is not None:
                 candidates = catalog.rows(
-                    "SELECT DISTINCT s.status_cluster_id,s.status FROM state_variants v JOIN states s USING(status_cluster_id) WHERE v.aspect_cluster_id=? AND v.raw_status=?",
+                    "SELECT DISTINCT v.state_variant_id,s.status_cluster_id,s.status FROM state_variants v JOIN states s USING(status_cluster_id) WHERE v.aspect_cluster_id=? AND v.raw_status=?",
                     (aid, unicodedata.normalize("NFC", unit["raw_status"])),
                 )
                 if len(candidates) == 1:
                     sid = candidates[0]["status_cluster_id"]
+                    raw_sid = candidates[0]["state_variant_id"]
                     status = candidates[0]["status"]
                     state = "mapped_exact"
         item.update(
+            raw_aspect_id=raw_aid,
+            state_variant_id=raw_sid,
             aspect_id=aid,
             status_id=sid,
             aspect=aspect,
@@ -254,7 +260,7 @@ def generate(pid, review, raw_units):
     groups = defaultdict(list)
     for unit in units:
         if unit["mapping_state"] == "mapped_exact":
-            groups[(unit["aspect_id"], unit["status_id"])].append(unit)
+            groups[(unit["raw_aspect_id"], unit["state_variant_id"])].append(unit)
     comparisons = []
     negative = []
     for (aid, sid), group in groups.items():
@@ -278,8 +284,8 @@ def generate(pid, review, raw_units):
         first = group[0]
         comparisons.append(
             {
-                "aspect": first["aspect"],
-                "status": first["status"],
+                "aspect": first["raw_aspect"],
+                "status": first["raw_status"],
                 "sentiment": sentiment,
                 "relation": relation,
                 "catalog": known,
@@ -287,7 +293,15 @@ def generate(pid, review, raw_units):
             }
         )
         if sentiment == "negative" and sid:
-            negative.append(first)
+            negative.append(
+                {
+                    **first,
+                    "aspect_id": aid,
+                    "status_id": sid,
+                    "aspect": first["raw_aspect"],
+                    "status": first["raw_status"],
+                }
+            )
     aspect_rows = sorted(
         [v for (p, a), v in aspects.items() if p == pid],
         key=lambda v: (-v["support"], v["aspect"]),
@@ -340,6 +354,7 @@ def generate(pid, review, raw_units):
         "policy": {
             "stored": False,
             "normalization": "exact-match",
+            "comparison_basis": "raw-expression-v1",
             "baseline": "frozen-catalog",
             "reclustering": False,
         },
@@ -365,10 +380,11 @@ def render(report):
         f"# {p['name']} 보고서",
         f"고정 카탈로그 `{report['catalog_version']}` · 기존 리뷰 {p['review_count']:,}개",
         "입력 리뷰는 저장되거나 기존 통계에 반영되지 않습니다. 새 군집과 유사 표현 후보를 생성하지 않습니다.",
+        "통계·비교·유사도·대안 점수는 원래 속성·상태 ID로 계산합니다. 정규 군집과 대표명은 참고용이며, 서로 다른 표현을 자동으로 합치지 않습니다.",
         "## 입력 리뷰",
         "> " + report["review"].replace("\n", "\n> "),
         "## 추출 및 Exact-match",
-        "| 원래 속성 | 원래 상태 | 정규 속성 / 상태 | 감성 | 매핑 |",
+        "| 원래 속성 | 원래 상태 | 정규 속성 / 상태 (참고) | 감성 | 매핑 |",
         "|---|---|---|---|---|",
     ]
     mapping = {
@@ -392,7 +408,7 @@ def render(report):
         )
     lines += [
         "## 기존 리뷰와의 비교",
-        "일치·상충은 같은 속성/상태의 리뷰별 감성 최빈값과 비교합니다. 제품 특성의 참·거짓 판정이 아닙니다.",
+        "일치·상충은 같은 원래 속성/상태의 리뷰별 감성 최빈값과 비교합니다. 제품 특성의 참·거짓 판정이 아닙니다.",
     ]
     for c in report["comparisons"]:
         stats = c["catalog"]
@@ -440,7 +456,7 @@ def render(report):
     add_alternatives("## 입력한 불편에 대한 대안", report["alternatives"])
     lines += [
         "## 상품의 기존 리뷰 요약",
-        "리뷰당 속성 또는 속성/상태별 한 표로 집계합니다. 미상을 포함한 관련 리뷰가 감성 비율의 분모입니다.",
+        "리뷰당 원래 속성 또는 원래 속성/상태별 한 표로 집계합니다. 미상을 포함한 관련 리뷰가 감성 비율의 분모입니다.",
         "| 속성 | 언급 리뷰 | 언급률 | 긍정 | 부정 | 혼합 | 중립 | 미상 | 긍정 95% Wilson 구간 |",
         "|---|---:|---:|---:|---:|---:|---:|---:|---|",
     ]
@@ -482,7 +498,7 @@ def render(report):
         "## 해석 범위",
         "- 정확 일치하지 않은 표현은 비교에서 제외합니다. 미해결은 상품이 조건을 충족하지 않는다는 뜻이 아닙니다.",
         "- 유사도는 속성 언급과 감성 분포로 계산합니다. 대안 점수는 유사도 25%와 조건별 효용 75%를 결합합니다.",
-        "- 기존 군집의 의미 혼합과 리뷰 표본 편향이 남아 있습니다. 통계는 수집된 리뷰에만 해당합니다.",
+        "- 정규 군집의 대표명에는 의미 혼합이 있을 수 있어 계산에 사용하지 않습니다. 원래 표현도 추출 오류와 표본 편향이 있을 수 있으며, 동의어가 자동 합산되지 않습니다.",
         "- 가격·판매 상태는 고정된 과거 자료이며 현재 구매 가능 여부를 보장하지 않습니다.",
     ]
     return "\n".join(lines)

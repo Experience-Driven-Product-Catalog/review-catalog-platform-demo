@@ -91,9 +91,16 @@ def test_all_mcp_discovery_and_evidence_tools():
     assert attributes["total_count"] > 0
     # Use the actual MCP selector returned by discovery, never invent an ID.
     aid = catalog.rows(
-        "SELECT aspect_cluster_id FROM aspect_variants WHERE raw_aspect='빛샘'"
-    )[0]["aspect_cluster_id"]
-    selector = {"clauses": [{"aspect_cluster_id": aid}]}
+        "SELECT aspect_cluster_id,raw_aspect_id FROM aspect_variants WHERE raw_aspect='빛샘'"
+    )[0]
+    selector = {
+        "clauses": [
+            {
+                "aspect_cluster_id": aid["aspect_cluster_id"],
+                "raw_aspect_ids": [aid["raw_aspect_id"]],
+            }
+        ]
+    }
     states = tools.invoke("list_review_states", {"attribute": selector})
     assert states["total_count"] > 0
     evidence = tools.invoke("get_review_evidence", {"attribute": selector, "limit": 2})
@@ -108,3 +115,68 @@ def test_all_mcp_discovery_and_evidence_tools():
     ]
     assert tools.invoke("search_product_docs", {"query": "시야각"})
     assert tools.invoke("compare_products", {"products": ["aoc-q27g2s", "lg-32qn650"]})
+
+
+def test_original_expression_statistics_do_not_merge_canonical_collisions():
+    # This source cluster contains opposite states. The source remains untouched.
+    mapped = reports.normalize(
+        [
+            {"raw_aspect": "빛샘", "raw_status": state}
+            for state in ("심함", "심하지 않음")
+        ]
+    )
+    assert mapped[0]["status_id"] == mapped[1]["status_id"]
+    assert mapped[0]["state_variant_id"] != mapped[1]["state_variant_id"]
+    _, aspects, pairs, _ = reports.base()
+    # Independently count unique reviews for every original expression axis.
+    for fields, aggregates in [
+        ("raw_aspect_id", aspects),
+        ("raw_aspect_id,state_variant_id", pairs),
+    ]:
+        rows = catalog.rows(
+            f"SELECT r.product_id,{fields},count(DISTINCT u.review_idx) AS n "
+            f"FROM opinion_units u JOIN reviews r ON r.review_id=u.review_idx "
+            f"GROUP BY r.product_id,{fields}"
+        )
+        for row in rows:
+            key = (row["product_id"], *(row[f] for f in fields.split(",")))
+            assert aggregates[key]["support"] == row["n"]
+    row = catalog.rows(
+        "SELECT r.product_id FROM opinion_units u JOIN reviews r ON r.review_id=u.review_idx WHERE raw_aspect='빛샘' AND raw_status='심함' LIMIT 1"
+    )[0]
+    result = reports.generate(
+        row["product_id"],
+        "빛샘이 심함",
+        [
+            {
+                "raw_aspect": "빛샘",
+                "raw_status": "심함",
+                "sentiment": "negative",
+                "excerpt": "빛샘이 심함",
+                "opinion": "빛샘이 심함",
+            }
+        ],
+    )
+    assert result["comparisons"][0]["status"] == "심함"
+    assert result["comparisons"][0]["catalog"]["status"] == "심함"
+    assert result["policy"]["comparison_basis"] == "raw-expression-v1"
+    for alternative in result["alternatives"]:
+        assert alternative["matches"][0]["status"] == "심함"
+
+
+def test_cluster_wide_selection_is_rejected_in_all_tool_schemas():
+    from jsonschema import Draft202012Validator, ValidationError
+
+    for schema in tools.SCHEMAS.values():
+        if "AttributeClause" not in schema.get("$defs", {}):
+            continue
+        validator = Draft202012Validator(schema["$defs"]["AttributeClause"])
+        for value in (None, []):
+            with pytest.raises(ValidationError):
+                validator.validate(
+                    {"aspect_cluster_id": "D-A-000048", "raw_aspect_ids": value}
+                )
+        with pytest.raises(ValidationError):
+            validator.validate({"aspect_cluster_id": "D-A-000048"})
+    discovery = tools.invoke("find_review_attributes", {"query": "빛샘"})
+    assert "cluster_selector" not in str(discovery)

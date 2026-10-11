@@ -8,3 +8,5 @@
 - FastMCP 서버/stdio 프로세스는 Lambda에서 실행하지 않음. `demo/tool_schemas.json`과 `demo/tools.py`에서 기존 8개 도구를 Responses function calling으로 연결.
 
 `policy.py`, 조건 판정·표시, 원래 속성/상태 탐색, 리뷰 집계, 점수와 증거 로직은 원본 계약을 유지합니다. 원본 리뷰/정규화 결과는 동일 MCP의 SQLite에서 가져옵니다.
+
+데모 전용 추가 정책은 원본 모듈을 바꾸지 않고 `demo/tools.py`에서 적용합니다. 모든 체감 선택자에 원래 속성 ID를 필수로 요구하고 군집 전체 선택자를 숨깁니다. 정규 군집/대표명은 탐색 참고용이며 서로 다른 표현을 자동 통합하지 않습니다. 보고서 계산은 별도 `demo/reports.py`에서 원래 속성/상태 ID로 수행합니다.

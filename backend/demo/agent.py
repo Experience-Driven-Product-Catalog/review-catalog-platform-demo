@@ -75,6 +75,7 @@ def verify(token):
         if (
             payload["expires"] < time.time()
             or payload["version"] != catalog.metadata()["source_data_version"]
+            or payload.get("comparison_policy") != tools.COMPARISON_POLICY
         ):
             raise ValueError()
         return payload
@@ -244,6 +245,7 @@ def chat_events(request):
                 "conditions": conditions,
                 "expires": int(time.time()) + 86400,
                 "version": catalog.metadata()["source_data_version"],
+                "comparison_policy": tools.COMPARISON_POLICY,
             }
             yield {
                 "type": "result",

@@ -1,7 +1,7 @@
 """Execute the existing keyboard_search MCP tools in-process inside Lambda.
 
-The tool schemas and search policy are from the MCP server. Only transport and
-the unified SQLite storage adapter differ; no remote/always-on MCP host is needed.
+The MCP implementation is reused with a unified SQLite adapter and stricter
+original-expression selectors; no remote/always-on MCP host is needed.
 """
 
 import json
@@ -21,6 +21,18 @@ from policy import POLICY_MD
 from schemas import AttributeSelector
 
 TOOLS = json.loads(Path(__file__).with_name("tool_schemas.json").read_text())
+COMPARISON_POLICY = "raw-expression-v1"
+DEMO_POLICY = "데모 정책: 정규 군집/대표명은 참고용이다. 모든 체감 선택자 clauses에 비어 있지 않은 raw_aspect_ids를 명시해야 한다. cluster_selector는 사용할 수 없다. 상태는 원래 state_variant_id를 선택한다. 여러 원래 표현의 OR 결합은 선택 표현을 사용자에게 명시하며, 군집 전체로 자동 확장하지 않는다."
+POLICY_MD += "\n\n" + DEMO_POLICY
+for tool in TOOLS:
+    clause = tool["parameters"].get("$defs", {}).get("AttributeClause")
+    if clause:
+        clause["properties"]["raw_aspect_ids"] = {
+            "type": "array",
+            "items": {"type": "string"},
+            "minItems": 1,
+        }
+        clause["required"] = ["aspect_cluster_id", "raw_aspect_ids"]
 SCHEMAS = {t["name"]: t["parameters"] for t in TOOLS}
 
 
@@ -70,6 +82,22 @@ def invoke(name: str, args: dict):
         )
     else:
         raise ValueError("Unsupported tool")
-    return plain(result)
+    result = plain(result)
+    if name == "get_search_guide":
+        result["demo_comparison_policy"] = DEMO_POLICY
+    if name == "find_review_attributes":
+
+        def remove_cluster_selector(value):
+            if isinstance(value, dict):
+                value.pop("cluster_selector", None)
+                for child in value.values():
+                    remove_cluster_selector(child)
+            elif isinstance(value, list):
+                for child in value:
+                    remove_cluster_selector(child)
+
+        remove_cluster_selector(result)
+    return result
+
 
 __all__ = ["POLICY_MD", "TOOLS", "invoke"]

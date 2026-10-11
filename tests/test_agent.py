@@ -91,6 +91,18 @@ def test_invalid_and_expired_session(monkeypatch):
         agent.verify(token)
     with pytest.raises(agent.PublicError):
         agent.verify(token + "a")
+    # A still-valid pre-policy session cannot restore old cluster-wide filters.
+    old_policy = agent.sign(
+        {
+            "response_id": "resp_old",
+            "filters": {},
+            "conditions": [],
+            "expires": time.time() + 3600,
+            "version": catalog.metadata()["source_data_version"],
+        }
+    )
+    with pytest.raises(agent.PublicError):
+        agent.verify(old_policy)
 
 
 def test_report_extraction_is_not_stored(monkeypatch):
