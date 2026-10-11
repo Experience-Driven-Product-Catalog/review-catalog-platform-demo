@@ -136,6 +136,7 @@ def main():
         {"OpenAIKey": env["OPENAI_API_KEY"], "SessionSecret": signing},
     )
     outputs = {o["OutputKey"]: o["OutputValue"] for o in stack["Outputs"]}
+    set_key(str(ROOT / ".env"), "AUDIT_BUCKET", outputs["AuditBucket"])
     outputs.update(
         region=region,
         catalog_sha256=catalog_sha,
