@@ -1,0 +1,17 @@
+[project]
+name = "review-catalog-platform-demo"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["fastapi>=0.115,<1", "uvicorn>=0.34,<1", "openai>=2,<4", "boto3>=1.40,<2", "jsonschema>=4.23,<5", "python-dotenv>=1,<2"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8,<10",
+ "httpx>=0.28,<1",
+ "pyyaml>=6,<7",
+ "botocore[crt]>=1.40,<2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["backend"]
+testpaths = ["tests"]

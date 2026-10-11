@@ -1,0 +1,17 @@
+{
+  "schema_version": "demo-1",
+  "source_data_version": "D-20261005-0db6aaa1d80aabcc",
+  "source_objective_sha256": "8b75f0c7f404dc304ea92a769bbded955f8bf889fd44bdaa686128fc0866a04d",
+  "source_experience_sha256": "14d7da11b0d4dbf8dfc004d3881312b8dcf1320eb10d9573fca848f56f433874",
+  "built_at": "2026-10-11T08:24:52.045741+00:00",
+  "counts": {
+    "products": 9,
+    "reviews": 1609,
+    "opinion_units": 4828,
+    "aspects": 568,
+    "states": 1884
+  },
+  "policy": "fixed-D/exact-match/read-only",
+  "input_storage": false,
+  "sha256": "b630d444743d6a107a0ec976363f187025e2445ed63d98c610f3a8e394bd746e"
+}
