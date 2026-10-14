@@ -9,7 +9,12 @@ export type Product = {
   refresh_hz: number;
   review_count: number;
 };
-export type Condition = { type: string; condition: string; value: string };
+export type Condition = {
+  type: "객관" | "체감" | "판매";
+  condition: string;
+  value: string;
+  method?: "search" | "filter" | "sort";
+};
 export type Session = {
   previous_response_id: string;
   continuation: string;

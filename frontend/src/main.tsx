@@ -16,6 +16,9 @@ import {
   RotateCcw,
   ChevronDown,
   Download,
+  Search,
+  ListFilter,
+  ArrowDownUp,
 } from "lucide-react";
 import {
   catalog,
@@ -36,7 +39,7 @@ type Message = {
 const examples = [
   "27인치 QHD 모니터 중 30만 원 이하로 찾아줘",
   "빛샘이 적다는 리뷰가 있는 모니터를 비교해줘",
-  "30만 원 이하에 무료배송인 가상 판매처가 있는 모니터를 찾아줘",
+  "30만 원 이하에 무료배송인 판매처가 있는 모니터를 찾아줘",
 ];
 const money = (n: number) => n.toLocaleString("ko-KR");
 function Markdown({ text }: { text: string }) {
@@ -47,22 +50,22 @@ function Markdown({ text }: { text: string }) {
   );
 }
 function Conditions({ items }: { items: Condition[] }) {
-  return (
-    items.length > 0 && (
-      <div className="conditions" aria-label="적용 조건">
-        {items.map((c, i) => (
-          <span
-            key={i}
-            className={"condition " + (c.type === "체감" ? "experience" : "")}
-          >
-            <b>{c.type}</b>
-            {c.condition}: {c.value}
-          </span>
-        ))}
-      </div>
-    )
+  const visible = items.filter(c => ["객관", "체감", "판매"].includes(c.type) && !/^제한\s*없음$/.test(c.value.trim()));
+  return visible.length > 0 && (
+    <div className="conditions" aria-label="적용 조건">
+      {visible.map((c, i) => {
+        const method = c.method || "filter";
+        const Icon = method === "search" ? Search : method === "sort" ? ArrowDownUp : ListFilter;
+        const label = method === "search" ? "검색" : method === "sort" ? "정렬" : "필터링";
+        return <span key={i} className={"condition " + (c.type === "체감" ? "experience" : "")}>
+          <Icon size={12} aria-label={label} role="img"><title>{label}</title></Icon>
+          <b>{c.type}:</b><span>{c.value}</span>
+        </span>;
+      })}
+    </div>
   );
 }
+
 function App() {
   const [page, setPage] = useState(location.hash.slice(1) || "home"),
     [data, setData] = useState<Catalog | null>(null),
@@ -73,7 +76,8 @@ function App() {
     [busy, setBusy] = useState(false),
     [status, setStatus] = useState(""),
     [error, setError] = useState(""),
-    [resetOpen, setResetOpen] = useState(false);
+    [resetOpen, setResetOpen] = useState(false),
+    [noticeAccepted, setNoticeAccepted] = useState(false);
   const [product, setProduct] = useState(""),
     [review, setReview] = useState(""),
     [report, setReport] = useState<ReportResult | null>(null),
@@ -84,7 +88,12 @@ function App() {
     reportController = useRef<AbortController | null>(null),
     epoch = useRef(0),
     bottom = useRef<HTMLDivElement>(null),
-    textarea = useRef<HTMLTextAreaElement>(null);
+    textarea = useRef<HTMLTextAreaElement>(null),
+    notice = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (page === "chat" && !noticeAccepted) notice.current?.showModal();
+    else if (page === "chat" && noticeAccepted) textarea.current?.focus();
+  }, [page, noticeAccepted]);
   useEffect(() => {
     const fn = () => setPage(location.hash.slice(1) || "home");
     window.addEventListener("hashchange", fn);
@@ -125,7 +134,7 @@ function App() {
     textarea.current?.focus();
   }
   async function send(text = input) {
-    if (!text.trim() || busy) return;
+    if (!text.trim() || busy || !noticeAccepted) return;
     const current = epoch.current;
     const abort = new AbortController();
     controller.current = abort;
@@ -435,7 +444,7 @@ function App() {
               </p>
               <p>
                 제출한 대화와 답변은 보안 점검을 위해 비공개 저장소에 보관되며
-                90일 후 자동 삭제 대상이 됩니다. 개인정보나 비밀번호를 입력하지 마세요. 판매 정보와 구매 링크는 데모 가상 데이터입니다.
+                90일 후 자동 삭제 대상이 됩니다. 개인정보나 비밀번호를 입력하지 마세요.
               </p>
               <details>
                 <summary>
@@ -455,7 +464,7 @@ function App() {
                 <span className="dot" />
                 모니터 쇼핑 Agent
               </span>
-              <span>9개 상품 · 판매 정보는 가상 데이터</span>
+              <span>9개 상품 · 근거 기반 비교</span>
             </div>
             <div className="conversation" aria-live="polite">
               {messages.length === 0 ? (
@@ -698,6 +707,14 @@ function App() {
           <p>객관적인 사양과 주관적인 경험 사이에서.</p>
           <span>PORTFOLIO DEMO · 2026</span>
         </footer>
+      )}
+      {page === "chat" && !noticeAccepted && (
+        <dialog ref={notice} className="modal demo-notice" aria-labelledby="notice-title" onCancel={e => e.preventDefault()}>
+          <ShieldCheck size={25} />
+          <h2 id="notice-title">시작 전에 확인해 주세요</h2>
+          <p>본 데모는 AI HUB의 <a href="https://aihub.or.kr/aihubdata/data/view.do?currMenu=115&topMenu=100&aihubDataSe=data&dataSetSn=71603" target="_blank" rel="noopener noreferrer">속성 기반 감성 분석 데이터셋</a>에서 추출한 9개의 모니터 상품을 기반으로 수행됩니다. 이에 따라 가격, 배송 정보와 같은 판매 속성은 과거 데이터 혹은 더미 데이터로 구성되어 있습니다.</p>
+          <div><button className="primary" onClick={() => setNoticeAccepted(true)} autoFocus>확인하고 시작</button></div>
+        </dialog>
       )}
       {resetOpen && (
         <div className="modal-backdrop" role="presentation">

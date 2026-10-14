@@ -155,3 +155,63 @@ def test_meta_connection_is_read_only_and_mutating_tools_unavailable():
         connection.execute("DELETE FROM offers")
     assert len(tools.TOOLS) == 9
     assert {"register_product", "get_registration_status"}.isdisjoint(tools.SCHEMAS)
+
+
+def test_condition_cards_hide_unrestricted_and_non_attribute_rows():
+    assert tools.invoke("search_products", {})["applied_conditions"] == []
+    assert (
+        tools.invoke("search_products", {"offer_filter": {"currency": "KRW"}})[
+            "applied_conditions"
+        ]
+        == []
+    )
+    result = tools.invoke(
+        "search_products",
+        {
+            "user_request": "27형을 찾고 싶어요",
+            "interpretation_notes": ["추가 조건 없음"],
+            "filters": [{"key": "size_class", "op": "eq", "value": 27}],
+            "offer_filter": {"max_shipping_fee": 0},
+            "sort": {"by": "price", "order": "desc"},
+        },
+    )
+    cards = result["applied_conditions"]
+    assert [(c["type"], c["method"]) for c in cards] == [
+        ("객관", "filter"),
+        ("판매", "filter"),
+        ("판매", "sort"),
+    ]
+    assert all(
+        c["type"] in ("객관", "체감", "판매") and c["value"] != "제한 없음"
+        for c in cards
+    )
+    assert not any("27형을 찾고 싶어요" in c["value"] for c in cards)
+    assert "배송비" in cards[1]["value"]
+    assert "내림차순" in cards[2]["value"]
+
+
+def test_evidence_topic_is_search_and_display_names_are_plain():
+    from vendor.meta_search.textnorm import make_id
+
+    result = tools.invoke(
+        "search_products",
+        {
+            "evidence_topics": [
+                {
+                    "topic_id": "bleed",
+                    "aspect_variant_ids": [make_id("av", "computer_monitor", "빛샘")],
+                }
+            ]
+        },
+    )
+    assert result["applied_conditions"] == [
+        {
+            "type": "체감",
+            "condition": "체감",
+            "value": "빛샘 리뷰 근거",
+            "method": "search",
+        }
+    ]
+    offers = tools.invoke("get_offers", {"product_ids": [1]})["products"][0]["offers"]
+    assert {o["retailer"] for o in offers} == {"쿠팡", "G마켓", "11번가"}
+    assert all("데모" not in o["seller"] and "가상" not in o["seller"] for o in offers)

@@ -14,7 +14,7 @@ from vendor.meta_search.textnorm import make_id
 
 CATEGORY = "computer_monitor"
 SYNTHETIC_AT = "2026-10-14T00:00:00Z"
-SALES_POLICY = "synthetic-offers-v1"
+SALES_POLICY = "synthetic-offers-v2"
 SALES_NOTICE = "판매처·가격·배송·재고·링크는 데모 가상 정보입니다. 확인 시각은 가상 데이터 기준일이며 실제 조회·판매·구매 가능성을 뜻하지 않습니다."
 # New taxonomy names for well-known monitor attributes; remaining source keys stay discoverable.
 RENAMES = {
@@ -220,8 +220,8 @@ def build(source, output):
                     "INSERT INTO offers(product_id,seller,retailer,url,price,currency,shipping_fee,shipping_days,availability,last_checked_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
                     (
                         pid,
-                        f"데모 모니터몰 {pid:02d}-{i + 1}",
-                        retailer + " (데모)",
+                        ["디스플레이몰", "모니터샵", "디지털스토어"][i],
+                        retailer,
                         url,
                         price,
                         "KRW",

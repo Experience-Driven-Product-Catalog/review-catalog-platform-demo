@@ -679,11 +679,14 @@ footer > span:last-child {
   padding: 5px 8px;
   border-radius: 5px;
   line-height: 1.7;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   overflow-wrap: anywhere;
 }
 .condition b {
   font-weight: 500;
-  margin-right: 7px;
+  white-space: nowrap;
   font-size: 9px;
   color: #809570;
 }
@@ -1220,3 +1223,8 @@ footer > span:last-child {
     transition: none !important;
   }
 }
+
+.demo-notice { border: 0; width: min(420px, calc(100vw - 40px)); margin: auto; max-height: calc(100dvh - 40px); overflow-y: auto; }
+.demo-notice::backdrop { background: #17251366; }
+.demo-notice a { color: #254f40; text-decoration: underline; }
+.condition > svg { flex: 0 0 auto; }

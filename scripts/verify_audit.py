@@ -100,7 +100,7 @@ first_body = {"message": "27인치 QHD 모니터를 찾아줘. 다른 조건은 
 first = post("/chat", first_body)
 first_record, first_prefix = stored("chat", first, first_body)
 follow_body = {
-    "message": "앞선 조건을 유지하고 상품가 30만 원 이하, 무료배송, 2일 이내 배송, 판매 중인 데모 가상 판매처가 있는 상품으로 좁혀줘.",
+    "message": "앞선 조건을 유지하고 상품가 30만 원 이하, 무료배송, 2일 이내 배송, 판매 중인 판매처가 있는 상품으로 좁혀줘.",
     **{
         k: first[k]
         for k in (
@@ -119,7 +119,14 @@ assert filters["offer_filter"]["max_shipping_fee"] == 0
 assert filters["offer_filter"]["max_shipping_days"] == 2
 assert filters["offer_filter"]["availability"] == ["available"]
 assert second["search_result"]["sales_data_policy"]["synthetic"] is True
-assert "가상" in second["answer"]
+assert not any(
+    label in second["answer"]
+    for label in ("(데모)", "가상 판매처", "데모 가상 판매 정보")
+)
+assert all(
+    c["type"] in ("객관", "체감", "판매") and c["value"] != "제한 없음"
+    for c in second["applied_conditions"]
+)
 assert second["search_result"]["matched_count"] == 1
 print("Meta-search objective + synthetic sales filters: PASS", flush=True)
 

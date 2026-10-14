@@ -57,7 +57,7 @@ uv run python scripts/build_catalog.py
 
 판매자·판매 사이트·가격·배송비·배송일·재고·URL·기준일을 `get_offers`로 조회할 수 있습니다. `offer_filter`는 같은 판매처 행이 모든 조건을 충족해야 통과합니다. `max_price`는 배송비 제외 상품가이며, 배송비 포함 금액은 `total_price`로 별도 제공됩니다. 판매 중 조건은 명시적으로 요청할 때 적용합니다.
 
-모든 도구 출력에 `sales_data_policy.synthetic=true`와 안내를 붙이고, UI 및 모델 지침에도 가상 정보임을 표시합니다. `last_checked_at=2026-10-14T00:00:00Z`는 **가상 데이터 기준일**이지 실제 확인일이 아닙니다. URL은 `https://www.coupang.com.invalid/vp/products/900000000100`과 같은 형태이며 실제 구매 페이지로 연결되지 않습니다. 인터넷 조사는 수행하지 않았습니다.
+메타데이터는 `sales_data_policy.synthetic=true`를 유지합니다. 사용자에게는 최초 채팅 진입 시 AI HUB의 [속성 기반 감성 분석 데이터셋](https://aihub.or.kr/aihubdata/data/view.do?currMenu=115&topMenu=100&aihubDataSe=data&dataSetSn=71603)에서 추출한 모니터 9개와 과거/더미 판매 정보라는 안내를 확인하게 합니다. 이 확인 상태는 현재 페이지 메모리에만 유지되고 새로고침 시 다시 안내합니다. 이후 판매처 이름과 답변에는 `(데모)`·`가상 판매처` 접두어를 붙이지 않습니다. 사용자가 실제 정보인지 질문하면 한계를 설명하며 새로 실시간 조회했다고 주장하지 않습니다. `last_checked_at=2026-10-14T00:00:00Z`는 **가상 데이터 기준일**이지 실제 확인일이 아닙니다. URL은 `https://www.coupang.com.invalid/vp/products/900000000100`과 같은 형태이며 실제 구매 페이지로 연결되지 않습니다. 인터넷 조사는 수행하지 않았습니다.
 
 ## 검색 도구와 대화
 
@@ -65,7 +65,7 @@ uv run python scripts/build_catalog.py
 
 `get_search_guide`, `search_products`, `compare_products`, `get_product_details`, `search_product_docs`, `find_review_attributes`, `list_review_states`, `get_review_evidence`, `get_offers`
 
-별도의 상시 MCP 서버를 만들지 않고, Responses API function calling을 동일한 도구 함수로 전달합니다. 통신·읽기 전용 SQLite 연결을 조정하고 상세 정보/가이드의 주요 속성 집계를 원래 표현 기준으로 유지합니다. 검색 결과에는 기존 UI를 위한 결과 수·조건 카드 필드를 추가합니다. 객관 필터, 원래 속성/상태 선택, 리뷰 단위 집계, Wilson 점수, UNKNOWN 처리 및 조건 미충족 정책은 기존 MCP를 따릅니다.
+별도의 상시 MCP 서버를 만들지 않고, Responses API function calling을 동일한 도구 함수로 전달합니다. 통신·읽기 전용 SQLite 연결을 조정하고 상세 정보/가이드의 주요 속성 집계를 원래 표현 기준으로 유지합니다. 검색 결과에는 UI를 위한 결과 수·조건 카드 필드를 추가합니다. 조건 카드는 객관·체감·판매 유형만 사용하며 요청문·해석·결과 수를 ‘검색’ 유형으로 노출하지 않습니다. 제한 없음 행은 숨기고, 명시한 필터·정렬·리뷰 근거 검색에 각각 filter/sort/search 메소드를 부여해 아이콘과 `속성: 값`으로 표시합니다. 객관 필터, 원래 속성/상태 선택, 리뷰 단위 집계, Wilson 점수, UNKNOWN 처리 및 조건 미충족 정책은 기존 MCP를 따릅니다.
 
 - 필수 조건은 AND, 명시한 속성 선택 절은 OR입니다.
 - 실제 원래 표현 ID를 조회한 뒤 사용합니다. 같은 군집이라는 이유만으로 모든 표현을 동일시하지 않습니다. 모든 체감 도구의 선택자에 비어 있지 않은 `aspect_variant_ids`가 필수이며 군집 전체 선택은 거부됩니다. 서로 다른 원래 표현의 명시적 OR 검색은 가능하지만 자동 동의어 통합은 하지 않습니다.

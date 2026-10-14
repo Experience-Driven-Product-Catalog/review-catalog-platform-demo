@@ -1,8 +1,8 @@
 {
   "schema_version": "meta-demo-2",
-  "source_data_version": "meta-demo-2-b630d444743d-synthetic-offers-v1",
+  "source_data_version": "meta-demo-2-b630d444743d-synthetic-offers-v2",
   "source_legacy_sha256": "b630d444743d6a107a0ec976363f187025e2445ed63d98c610f3a8e394bd746e",
-  "built_at": "2026-10-14T02:20:10.111473+00:00",
+  "built_at": "2026-10-14T04:38:09.429684+00:00",
   "counts": {
     "products": 9,
     "reviews": 1609,
@@ -14,10 +14,10 @@
   "policy": "fixed-nine/original-expression/read-only",
   "sales": {
     "synthetic": true,
-    "policy": "synthetic-offers-v1",
+    "policy": "synthetic-offers-v2",
     "reference_at": "2026-10-14T00:00:00Z",
     "notice": "판매처·가격·배송·재고·링크는 데모 가상 정보입니다. 확인 시각은 가상 데이터 기준일이며 실제 조회·판매·구매 가능성을 뜻하지 않습니다."
   },
   "catalog_input_storage": false,
-  "sha256": "7e6571d72cb861651e9b85ff08eb7130fa545953cb649c37eb7f67da60ade3fa"
+  "sha256": "0b8d7f1fe1181fcff25dcb9403471269117598a96e263b22f5f9a4fc1e1357a2"
 }
