@@ -4,7 +4,7 @@ import time
 from types import SimpleNamespace
 
 import pytest
-from demo import agent, audit, catalog, reports, tools
+from demo import agent, audit, catalog, chat_policy, reports, tools
 from demo.app import ChatRequest, ReportRequest, app
 from fastapi.testclient import TestClient
 
@@ -27,6 +27,7 @@ def chat_factory(body, audit_context):
         "expires": time.time() + 3600,
         "version": catalog.metadata()["source_data_version"],
         "comparison_policy": tools.COMPARISON_POLICY,
+        "answer_policy": chat_policy.VERSION,
         "audit_session_id": audit_context["session_id"],
         "audit_request_id": audit_context["request_id"],
     }

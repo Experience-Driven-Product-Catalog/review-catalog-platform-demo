@@ -13,7 +13,7 @@ from jsonschema import ValidationError as SchemaError
 from openai import OpenAI
 from pydantic import BaseModel, ConfigDict, Field
 
-from . import catalog, reports, tools
+from . import catalog, chat_policy, reports, tools
 
 
 class PublicError(Exception):
@@ -76,13 +76,14 @@ def verify(token):
             payload["expires"] < time.time()
             or payload["version"] != catalog.metadata()["source_data_version"]
             or payload.get("comparison_policy") != tools.COMPARISON_POLICY
+            or payload.get("answer_policy") != chat_policy.VERSION
         ):
             raise ValueError()
         return payload
     except (ValueError, KeyError, TypeError):
         raise PublicError(
             "SESSION_EXPIRED",
-            "대화 연결이 만료되었거나 카탈로그가 변경되었습니다. 새 대화를 시작해 주세요.",
+            "대화 연결이 만료되었거나 카탈로그·답변 정책이 변경되었습니다. 새 대화를 시작해 주세요.",
         ) from None
 
 
@@ -150,10 +151,11 @@ CHAT_INSTRUCTIONS = """Formatting re-enabled
 - 체감 표현은 실제 속성과 상태 ID를 탐색한 뒤 선택한다. 원래 표현이 다른 것을 단순히 같은 군집이라는 이유만으로 혼합하지 않는다.
 - 검색을 요청받으면 search_products를 호출하고 그 최종 결과를 답변의 기준으로 삼는다. 후보 0개면 '조건에 부합하는 상품이 없습니다.'라고 밝힌다.
 - 상세 비교·근거 요청은 해당 도구를 호출한다. 도구에서 확인하지 않은 상품·수치·리뷰를 생성하지 않는다.
-- 사용자는 채팅 시작 안내에서 데이터 출처와 판매 정보가 과거/더미 데이터임을 확인했다. 이후 판매처·가격·배송·재고를 일반적인 표현으로 안내하며 가상/데모 문구를 반복하지 않는다. 새로 실제 조회했다고 주장하지 않고 진위를 질문받으면 한계를 설명한다. get_offers로 배송비 포함 총액·판매처·기준일을 확인할 수 있다.
+- 사용자는 채팅 시작 안내에서 데이터 출처와 판매 정보가 과거/더미 데이터임을 확인했다. 이후 판매처·가격·배송·재고를 일반적인 표현으로 안내하며 가상/데모 문구를 반복하지 않는다. 새로 실제 조회했다고 주장하지 않고 진위를 질문받으면 한계를 설명한다. get_offers로 배송비 포함 총액과 판매처를 확인한다. 판매 정보 기준 시각은 답변에 표시하지 않는다.
 - 조건을 완화해서 다시 검색하지 않는다. 완화 제안만 하고 사용자 선택을 기다린다.
 - 도구 오류는 수정하여 재호출하거나 미확인으로 안내한다. 도구 호출 한도를 고려해 필요한 도구만 선택한다.
-- 답변은 간결한 한국어 Markdown으로 작성하고 리뷰 수, 상반 근거, 모르는 내용을 명시한다.
+- 답변은 간결한 한국어 Markdown으로 작성하고 리뷰 수, 상반 평가 수, 모르는 내용을 명시한다.
+{answer_policy}
 """
 
 
@@ -189,8 +191,10 @@ def chat_events(request, audit_context=None):
     conditions = state.get("conditions", [])
     final_search = None
     yield {"type": "status", "message": "조건과 리뷰 근거를 확인하고 있습니다."}
-    instructions = CHAT_INSTRUCTIONS.format(policy=tools.POLICY_MD)
-    guide = tools.invoke("get_search_guide", {})
+    instructions = CHAT_INSTRUCTIONS.format(
+        policy=tools.POLICY_MD, answer_policy=chat_policy.RULES
+    )
+    guide = tools.for_chat("get_search_guide", {})
     inputs = [
         {
             "role": "developer",
@@ -254,6 +258,7 @@ def chat_events(request, audit_context=None):
                 "expires": int(time.time()) + 86400,
                 "version": catalog.metadata()["source_data_version"],
                 "comparison_policy": tools.COMPARISON_POLICY,
+                "answer_policy": chat_policy.VERSION,
             }
             if audit_context:
                 payload["audit_session_id"] = audit_context["session_id"]
@@ -285,12 +290,12 @@ def chat_events(request, audit_context=None):
                     "find_review_attributes": "관련 체감 속성을 찾고 있습니다.",
                     "list_review_states": "리뷰에 기록된 상태를 확인하고 있습니다.",
                     "search_products": "모든 조건으로 9개 상품을 검색하고 있습니다.",
-                    "get_review_evidence": "리뷰 원문을 확인하고 있습니다.",
+                    "get_review_evidence": "리뷰 통계를 확인하고 있습니다.",
                 }.get(call.name, "상품 근거를 확인하고 있습니다."),
             }
             try:
                 args = json.loads(call.arguments)
-                result = tools.invoke(call.name, args)
+                result = tools.for_chat(call.name, args)
                 if call.name == "search_products":
                     filters = args
                     conditions = result.get("applied_conditions", [])

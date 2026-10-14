@@ -8,7 +8,7 @@ from jsonschema import Draft202012Validator
 from vendor.meta_search.policy import INSTRUCTIONS
 from vendor.meta_search.search.service import SearchService
 
-from . import catalog
+from . import catalog, chat_policy
 
 TOOLS = json.loads(Path(__file__).with_name("tool_schemas.json").read_text())
 COMPARISON_POLICY = "raw-expression-v1"
@@ -18,7 +18,7 @@ DEMO_POLICY = """데모 우선 정책:
 - aspect_variant_ids와 state_variant_id는 원래 표현 기준이다. 군집 대표명은 참고용이며 같은 군집이라는 이유로 다른 표현을 자동 합치지 않는다.
 - 속성 탐색의 variants와 matched_selector에서 원래 표현을 선택한다. 여러 표현 OR 결합은 선택한 표현을 사용자에게 명시한다.
 - 판매처·가격·배송·재고·링크는 모두 데모 가상 데이터다. 실제 판매/가격 조사 결과로 표현하지 않는다. 채팅 시작 안내에서 출처와 과거/더미 정보임을 설명하므로 이후 답변에서는 '가상', '(데모)', '더미 판매처' 같은 접두어를 반복하지 않고 일반적인 판매처·가격·배송 표현을 쓴다. 사용자가 진위를 물으면 실제 조회 결과가 아님을 설명한다.
-- .invalid URL은 실제 구매 링크가 아니다. last_checked_at은 가상 데이터 기준일이며 실제 확인일이 아니다.
+- .invalid URL은 실제 구매 링크가 아니다. 판매 정보 시각은 답변에 표시하지 않는다.
 - 기존 상세 문서의 과거 가격과 offers의 가상 판매가는 구분한다. 판매 필터·정렬은 offers를 사용한다.
 - 적용 조건은 웹 UI가 별도로 표시하므로 답변에 applied_filters_markdown이나 JSON을 반복 출력하지 않는다.
 """
@@ -38,6 +38,10 @@ for t in TOOLS:
     if t["name"] == "search_products":
         t["description"] = (
             "전체 객관·체감·판매 조건을 받아 검색한다. 적용 조건은 UI가 별도 표시한다."
+        )
+    if t["name"] == "get_review_evidence":
+        t["description"] = (
+            "선택한 원래 속성의 제품별 리뷰 통계(관련 전체 수·긍정 수·비율)를 조회한다. 원문은 제공하지 않는다."
         )
     if t["name"] == "get_offers":
         t["description"] = (
@@ -94,6 +98,11 @@ def conditions(args, markdown):
                 {"type": label, "condition": label, "value": value, "method": "filter"}
             )
         elif label == "정렬" and args.get("sort"):
+            value = (
+                value.replace("긍정 Wilson 하한", "긍정 평가")
+                .replace("상태 Wilson 하한", "상태 일치")
+                .replace("체감 점수", "체감 평가")
+            )
             kind = {"price": "판매", "attribute": "객관", "experience": "체감"}[
                 args["sort"].get("by", "price")
             ]
@@ -160,4 +169,19 @@ def invoke(name, args):
     return result
 
 
-__all__ = ["COMPARISON_POLICY", "POLICY_MD", "TOOLS", "invoke"]
+def for_chat(name, args):
+    native = invoke(name, args)
+    if name == "get_review_evidence":
+        result = chat_policy.evidence_statistics(args, native)
+    else:
+        result = native
+    result = chat_policy.project(result)
+    if name == "get_search_guide":
+        result["answer_policy"] = [
+            line for line in result["answer_policy"] if "last_checked_at" not in line
+        ]
+    result["chat_answer_policy"] = chat_policy.RULES
+    return result
+
+
+__all__ = ["COMPARISON_POLICY", "POLICY_MD", "TOOLS", "for_chat", "invoke"]
