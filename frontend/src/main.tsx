@@ -36,7 +36,7 @@ type Message = {
 const examples = [
   "27인치 QHD 모니터 중 30만 원 이하로 찾아줘",
   "빛샘이 적다는 리뷰가 있는 모니터를 비교해줘",
-  "문서 작업에 사용할 모니터를 함께 골라줘",
+  "30만 원 이하에 무료배송인 가상 판매처가 있는 모니터를 찾아줘",
 ];
 const money = (n: number) => n.toLocaleString("ko-KR");
 function Markdown({ text }: { text: string }) {
