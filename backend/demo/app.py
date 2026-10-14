@@ -26,7 +26,7 @@ app.add_middleware(
 
 class ReportRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    product_id: str = Field(min_length=1, max_length=100)
+    product_id: str | int
     review: str = Field(min_length=3, max_length=8000)
 
 

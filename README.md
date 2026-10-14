@@ -23,44 +23,55 @@ flowchart LR
     Chat --> Audit
     Report --> Extract[OpenAI Responses / Luna high]
     Chat --> Answer[OpenAI Responses / Sol medium]
-    Chat --> MCP[keyboard_search 도구 / 동일 프로세스]
+    Chat --> MCP[meta-search 읽기 전용 도구 / 동일 프로세스]
 ```
 
 Lambda는 실행이 끝나면 응답을 종료합니다. 다음 요청이 같은 실행 환경에서 처리된다는 가정을 하지 않습니다. EC2, PostgreSQL, DuckDB, Airflow, 임베딩 모델, 재군집화 서버는 배포하지 않습니다. 기존 EC2 리소스의 종료·삭제는 이 프로젝트의 배포에 포함되지 않습니다.
 
 ## 데이터 원본
 
-원본은 **keyboard_search의 SQLite**입니다. 기존 플랫폼의 DuckDB·PostgreSQL은 사용하지 않습니다.
+상품 데이터는 기존 **모니터 9개·리뷰 1,609개·Opinion Units 4,828개**를 유지합니다. 최신 meta-search의 실제 상품/키보드 데이터는 가져오지 않습니다. 기존 플랫폼의 DuckDB·PostgreSQL도 사용하지 않습니다.
 
-- `keyboard_search/products.sqlite`: 객관 속성, 기능 근거, 고정 가격
-- `keyboard_search/data/experience/experience.sqlite`: 리뷰 1,609개, Opinion Units 4,828개, 고정 실험 D 정규화 및 원래 표현 매핑
-- 상품 상세 Markdown: 동일 MCP 배포의 문서
-- 통합 결과: `data/catalog.sqlite`, 출처·SHA-256·건수: `data/manifest.json`
+- 보존 원본: `data/source/keyboard_search.sqlite` (기존 배포의 고정 스냅샷)
+- 실행 데이터: `data/catalog.sqlite` — meta-search 네이티브 스키마로 변환
+- 출처·건수·SHA-256·가상 판매 정책: `data/manifest.json`
+- 상품 ID는 정수로 변환하고 `demo_product_ids`에 기존 slug와의 대응을 보존합니다. 보고서 API는 이전 slug도 허용합니다.
+- 객관 속성은 `category_attributes`/`product_attributes` EAV로 이전합니다. `screen_size`, `refresh_rate` 등 새 키와 기존 보조 키를 가이드에서 조회할 수 있습니다. 원래 값·미확인·명시적 false를 유지합니다.
+- 리뷰 본문, Opinion Unit 발췌·의견·감성 및 기존 군집 대표명은 그대로입니다. 원래 표현 ID만 meta-search의 `av_`/`sv_` 규칙(NFKC·공백 정리·casefold 기반 결정적 ID)으로 변환합니다. 재군집화하지 않습니다.
+- 원본 상품 행은 `demo_source_products`에 보존하고 상세 Markdown은 `products.details_md`에 넣습니다. 최신 meta-search의 등록 작업 이력은 포함하지 않습니다.
+- 사용자 입력은 카탈로그에 반영하지 않으며 기존 비공개 S3 보안 기록 정책을 유지합니다.
 
-저장소의 고정 SQLite는 재현과 테스트용으로 포함합니다. 배포 때 같은 파일을 S3에 올립니다. 사용자 입력 리뷰·채팅·보고서는 이 SQLite에 반영하지 않으며, 별도 비공개 S3 버킷에 보안 기록으로 보관합니다. 메타데이터와 원문 근거는 정적 카탈로그에만 해당합니다.
-
-기존 MCP 데이터에서 다시 묶을 때:
+재현:
 
 ```bash
-uv sync --frozen
-uv run python scripts/build_catalog.py --source /path/to/keyboard_search
+# 원본 meta-search에 설치된 MCP/Pydantic으로 도구 시그니처만 내보냅니다.
+../meta-search/.venv/bin/python scripts/sync_meta_search.py --source ../meta-search
+uv run python scripts/build_catalog.py
 ```
 
-이 명령은 이미 정규화된 데이터를 결합하고 무결성을 확인할 뿐, 추출·임베딩·군집화를 하지 않습니다. Lambda는 배포된 특정 해시의 파일만 읽습니다. 데이터 변경은 새 파일과 코드 환경을 함께 배포해야 적용됩니다.
+변환기는 원본을 읽기 전용으로 열고 별도 파일을 생성합니다. 실행 중 상품 등록·수집·재군집화·임베딩·웹 조사는 하지 않습니다. Lambda는 새 해시의 고정 SQLite만 읽습니다.
+
+### 가상 판매 정보
+
+`offers`에는 상품별 3개씩 **27개 가상 판매처**를 넣습니다. 기존 가격 범위를 기준으로 소폭 차이를 둔 판매가, 배송비 0/2,500/3,000원과 미확인, 배송일 1~5일과 미확인, 판매 중/품절/단종/미확인 상태를 구성합니다. 가상 판매가는 실측 판매가나 실제 재고가 아닙니다. 오래된 상품 상세 문서의 과거 판매 정보와 구분합니다.
+
+판매자·판매 사이트·가격·배송비·배송일·재고·URL·기준일을 `get_offers`로 조회할 수 있습니다. `offer_filter`는 같은 판매처 행이 모든 조건을 충족해야 통과합니다. `max_price`는 배송비 제외 상품가이며, 배송비 포함 금액은 `total_price`로 별도 제공됩니다. 판매 중 조건은 명시적으로 요청할 때 적용합니다.
+
+모든 도구 출력에 `sales_data_policy.synthetic=true`와 안내를 붙이고, UI 및 모델 지침에도 가상 정보임을 표시합니다. `last_checked_at=2026-10-14T00:00:00Z`는 **가상 데이터 기준일**이지 실제 확인일이 아닙니다. URL은 `https://www.coupang.com.invalid/vp/products/900000000100`과 같은 형태이며 실제 구매 페이지로 연결되지 않습니다. 인터넷 조사는 수행하지 않았습니다.
 
 ## 검색 도구와 대화
 
-`backend/vendor/keyboard_search`는 사용자가 지정한 기존 MCP의 검색 로직과 정책을 보존합니다. `UPSTREAM.json`에 원본 코드 해시를 기록했습니다. 아래 8개 도구의 입력 스키마는 기존 FastMCP 서버에서 내보냈습니다.
+`backend/vendor/meta_search`에 최신 meta-search의 검색 모듈과 원본 해시를 보존합니다. 원본 `server.py`를 실행하지 않고 함수 시그니처에서 읽기 전용 도구 9개의 스키마를 내보냈습니다. 등록·등록 상태 조회 도구는 노출하지 않습니다.
 
-`get_search_guide`, `search_products`, `compare_products`, `get_product_details`, `search_product_docs`, `find_review_attributes`, `list_review_states`, `get_review_evidence`
+`get_search_guide`, `search_products`, `compare_products`, `get_product_details`, `search_product_docs`, `find_review_attributes`, `list_review_states`, `get_review_evidence`, `get_offers`
 
-별도의 상시 MCP 서버를 만들지 않고, Responses API function calling을 동일한 도구 함수로 전달합니다. 바뀐 것은 통신 계층과 SQLite·문서 로딩 어댑터입니다. 객관 필터, 원래 속성/상태 선택, 리뷰 단위 집계, Wilson 점수, UNKNOWN 처리 및 조건 미충족 정책은 기존 MCP를 따릅니다.
+별도의 상시 MCP 서버를 만들지 않고, Responses API function calling을 동일한 도구 함수로 전달합니다. 통신·읽기 전용 SQLite 연결을 조정하고 상세 정보/가이드의 주요 속성 집계를 원래 표현 기준으로 유지합니다. 검색 결과에는 기존 UI를 위한 결과 수·조건 카드 필드를 추가합니다. 객관 필터, 원래 속성/상태 선택, 리뷰 단위 집계, Wilson 점수, UNKNOWN 처리 및 조건 미충족 정책은 기존 MCP를 따릅니다.
 
 - 필수 조건은 AND, 명시한 속성 선택 절은 OR입니다.
-- 실제 원래 표현 ID를 조회한 뒤 사용합니다. 같은 군집이라는 이유만으로 모든 표현을 동일시하지 않습니다. 모든 체감 도구의 선택자에 비어 있지 않은 `raw_aspect_ids`가 필수이며 군집 전체 선택은 거부됩니다. 서로 다른 원래 표현의 명시적 OR 검색은 가능하지만 자동 동의어 통합은 하지 않습니다.
+- 실제 원래 표현 ID를 조회한 뒤 사용합니다. 같은 군집이라는 이유만으로 모든 표현을 동일시하지 않습니다. 모든 체감 도구의 선택자에 비어 있지 않은 `aspect_variant_ids`가 필수이며 군집 전체 선택은 거부됩니다. 서로 다른 원래 표현의 명시적 OR 검색은 가능하지만 자동 동의어 통합은 하지 않습니다.
 - 일치 상품이 없으면 없다고 답하고, 자동으로 조건을 완화하지 않습니다.
 - 상반 리뷰와 근거 부족을 제품의 결함·미지원과 구분합니다.
-- 가격·판매 상태는 과거 스냅샷이며 실시간 정보가 아닙니다.
+- 판매 정보는 전부 데모 가상 데이터이며 실시간 또는 실제 확인 정보가 아닙니다.
 
 Frontend는 한 대화의 메시지, 적용 조건, 재호출용 전체 검색 인자, `previous_response_id`, 서명된 continuation을 **메모리**에만 보관합니다. 새 대화는 확인 창 뒤 이를 모두 초기화하고 진행 중 응답을 무시합니다. localStorage, sessionStorage, IndexedDB를 사용하지 않습니다. 페이지를 닫거나 새로고침하면 화면에서 복구할 수 없습니다. 서버의 보안 기록은 삭제되지 않으며 90일 보관 정책이 적용됩니다.
 
@@ -92,9 +103,9 @@ continuation에는 서버 발급 보안 기록용 대화/요청 ID, 만료 시�
 4. 해당 상품의 기존 리뷰 요약: 주요 속성/상태, 언급률, 감성 분포, Wilson 구간, 대표 근거
 5. 부정·논쟁 속성, 체감 프로필이 유사한 상품, 기존 약점의 대안
 
-Exact-match는 NFC 표기 정리 이후 기존 **원래 속성 문자열**, 해당 속성 안의 **원래 상태 문자열**을 조회합니다. 하나의 원래 표현 ID로 결정되지 않으면 미해결입니다. 정규 ID와 대표명은 참고 정보로만 반환합니다. 상태가 null이면 상태를 만들어 내지 않습니다. 새 임베딩 후보, 유사 표현 매핑, 군집 생성은 없습니다. `전반적 상품 경험`은 비교에서 제외합니다. 추출된 발췌가 입력 리뷰의 연속 부분 문자열이 아니면 보고서를 반환하지 않습니다.
+Exact-match는 meta-search의 원래 표현 ID 규칙(NFKC·공백 정리·casefold)으로 기존 **원래 속성 문자열**, 해당 속성에서 실제 관측된 **원래 상태 문자열**을 조회합니다. 하나의 원래 표현 ID로 결정되지 않으면 미해결입니다. 정규 ID와 대표명은 참고 정보로만 반환합니다. 상태가 null이면 상태를 만들어 내지 않습니다. 새 임베딩 후보, 유사 표현 매핑, 군집 생성은 없습니다. `전반적 상품 경험`은 비교에서 제외합니다. 추출된 발췌가 입력 리뷰의 연속 부분 문자열이 아니면 보고서를 반환하지 않습니다.
 
-**모든 체감 비교는 `raw-expression-v1` 정책을 따릅니다.** 보고서의 언급 수·감성 분포·일치/상충·유사도·약점·대안 점수는 `raw_aspect_id`와 `state_variant_id`로 계산합니다. 리뷰당 원래 속성 또는 원래 속성/상태별 한 표를 사용합니다. 미상을 제외한 감성이 하나이면 해당 감성, 둘 이상이면 혼합, 전부 미상이면 미상입니다. 95% Wilson 구간과 상품 프로필 사전 강도 5, 근거 신뢰도, 기존 대안 점수(체감 유사도 25% + 효용 75%)를 새 SQLite 코드로 구현했습니다. 대안 점수는 일부 조건 근거를 허용하는 탐색용 순위이므로 **모든 필수 조건을 충족하는 검색 결과와 다릅니다.** 보고서에서 이 한계를 명시합니다.
+**모든 체감 비교는 `raw-expression-v1` 정책을 따릅니다.** 보고서의 언급 수·감성 분포·일치/상충·유사도·약점·대안 점수는 `aspect_variant_id`와 `state_variant_id`로 계산합니다. 리뷰당 원래 속성 또는 원래 속성/상태별 한 표를 사용합니다. 미상을 제외한 감성이 하나이면 해당 감성, 둘 이상이면 혼합, 전부 미상이면 미상입니다. 95% Wilson 구간과 상품 프로필 사전 강도 5, 근거 신뢰도, 기존 대안 점수(체감 유사도 25% + 효용 75%)를 새 SQLite 코드로 구현했습니다. 대안 점수는 일부 조건 근거를 허용하는 탐색용 순위이므로 **모든 필수 조건을 충족하는 검색 결과와 다릅니다.** 보고서에서 이 한계를 명시합니다.
 
 비교 기준은 입력을 추가하지 않은 고정 카탈로그입니다. 마지막 등록 리뷰, 사용자 입력 이력, 재군집화 진단 및 실제 검사 없는 품질 보증 값은 제거했습니다. 보고서는 결정적 계산으로 작성하고 Markdown 다운로드를 제공합니다.
 

@@ -1,5 +1,6 @@
 export type Product = {
-  product_id: string;
+  product_id: number;
+  legacy_id: string;
   name: string;
   brand: string;
   model: string;

@@ -31,7 +31,13 @@ def test_chat_chain_and_new_session(monkeypatch):
                     NS(
                         type="function_call",
                         name="search_products",
-                        arguments=json.dumps({"size_classes": [27]}),
+                        arguments=json.dumps(
+                            {
+                                "filters": [
+                                    {"key": "screen_size", "op": "eq", "value": 27}
+                                ]
+                            }
+                        ),
                         call_id="call1",
                     )
                 ],
@@ -46,7 +52,9 @@ def test_chat_chain_and_new_session(monkeypatch):
     assert fake.calls[1]["input"][0]["type"] == "function_call_output"
     assert fake.calls[0]["model"] == "gpt-6.1-sol"
     assert fake.calls[0]["reasoning"] == {"effort": "medium"}
-    assert result["applied_filters"] == {"size_classes": [27]}
+    assert result["applied_filters"] == {
+        "filters": [{"key": "screen_size", "op": "eq", "value": 27}]
+    }
     fake2 = Responses([response("resp_3")])
     monkeypatch.setattr(agent, "client", lambda: NS(responses=fake2))
     request = ChatRequest(
@@ -63,7 +71,7 @@ def test_chat_chain_and_new_session(monkeypatch):
     )
     list(agent.chat_events(request))
     assert fake2.calls[0]["previous_response_id"] == "resp_2"
-    assert "[27]" in fake2.calls[0]["input"][0]["content"]
+    assert "screen_size" in fake2.calls[0]["input"][0]["content"]
     fake3 = Responses([response("resp_new")])
     monkeypatch.setattr(agent, "client", lambda: NS(responses=fake3))
     list(agent.chat_events(ChatRequest(message="새 대화")))

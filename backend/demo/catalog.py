@@ -59,7 +59,22 @@ def metadata():
     }
 
 
-def products():
-    return rows(
-        "SELECT product_id,name,brand,model,size_class,resolution_class,refresh_hz,review_count FROM products ORDER BY name"
+def resolve_product_id(value):
+    found = rows(
+        "SELECT product_id FROM demo_product_ids WHERE legacy_id=? OR CAST(product_id AS TEXT)=?",
+        (str(value), str(value)),
     )
+    if not found:
+        raise ValueError("등록된 상품이 아닙니다.")
+    return found[0]["product_id"]
+
+
+def products():
+    return rows("""
+        SELECT p.product_id,m.legacy_id,p.name,p.brand,p.model,p.category_id,
+        (SELECT json_extract(value_json,'$') FROM product_attributes WHERE product_id=p.product_id AND key='size_class') AS size_class,
+        (SELECT json_extract(value_json,'$') FROM product_attributes WHERE product_id=p.product_id AND key='resolution_class') AS resolution_class,
+        (SELECT json_extract(value_json,'$') FROM product_attributes WHERE product_id=p.product_id AND key='refresh_rate') AS refresh_hz,
+        (SELECT COUNT(*) FROM reviews WHERE product_id=p.product_id) AS review_count
+        FROM products p JOIN demo_product_ids m USING(product_id) WHERE p.status='ready' ORDER BY p.name
+    """)

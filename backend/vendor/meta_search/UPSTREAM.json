@@ -1,0 +1,24 @@
+{
+  "source": "meta-search/src/meta_search",
+  "files": {
+    "__init__.py": "306f7c1b268cac23141dc9abe677f40a0a502515079c2006c0520ab735356d06",
+    "policy.py": "f2478d24d140a464741c7283a2466ed2cf4d406bdd1dab4114a860b88474af1d",
+    "textnorm.py": "46ec077b7e0d4f7afe41b33188215a8feab85a8ccc3bfc3e5f3b93d4108ffc43",
+    "validation.py": "8ec4ea1f8929a4cd8d62b1639976d9ca2d6b429b4a06bedfea0586c99c2d4da2",
+    "schema.sql": "d84f61a6e05d3c7b20a08845274a4851bd8f4ab6a242efd727d07aebeca3cc40",
+    "search/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "search/experience.py": "f61620d53508c06253f74a8042c51d666e49eb0a855f948943bed4ffe9be7fb6",
+    "search/models.py": "0008ee75f3c0bc9dc747fee8fe6301cf0de9e875ceab9e37d9adf70d36a5705f",
+    "search/objective_filter.py": "e8b27d1a77f45a821f6fb981f894669b668029a1547fa2a89636fdf417c6fbcd",
+    "search/offers.py": "31931a61c2ee72ca32bd66fc9cc9aae1f5b598ed302ce8c31bbfbf49a45d4d62",
+    "search/render.py": "ee59f3a583263189d22140bd87feb88666f75d6cec69989bf1be5bd3d00eff6f",
+    "search/repository.py": "1fca91b42b1a0d8285fa46971897846bba78b171f9bc60c791f4e7c03868150d",
+    "search/service.py": "d8045627e47f588450dfc15c56d122068454c9f002a79a8d3f6fc205dca4dd19",
+    "server.py": "2e89a6485c74beb8953edea3ea5b9d8a0d5d2987a6fa89f52e1030cf854ec7c1"
+  },
+  "adaptations": [
+    "ToolError transport shim",
+    "read-only SQLite connection",
+    "top aspect summaries use original expression IDs"
+  ]
+}

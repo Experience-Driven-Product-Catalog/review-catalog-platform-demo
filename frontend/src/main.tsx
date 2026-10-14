@@ -91,7 +91,7 @@ function App() {
     catalog()
       .then((d) => {
         setData(d);
-        setProduct(d.products[0]?.product_id || "");
+        setProduct(d.products[0] ? String(d.products[0].product_id) : "");
       })
       .catch(() =>
         setLoadError(
@@ -393,7 +393,7 @@ function App() {
           <section className="scope-note">
             <b>공개 포트폴리오 데모</b>
             <p>
-              고정된 9개 모니터만 다룹니다. 가격과 판매 상태는 과거 자료이며,
+              고정된 9개 모니터만 다룹니다. 판매처·가격·배송·재고·링크는 데모 가상 정보이며,
               리뷰 근거는 제품의 성능이나 만족도를 보장하지 않습니다.
             </p>
           </section>
@@ -435,7 +435,7 @@ function App() {
               </p>
               <p>
                 제출한 대화와 답변은 보안 점검을 위해 비공개 저장소에 보관되며
-                90일 후 자동 삭제 대상이 됩니다. 개인정보나 비밀번호를 입력하지 마세요.
+                90일 후 자동 삭제 대상이 됩니다. 개인정보나 비밀번호를 입력하지 마세요. 판매 정보와 구매 링크는 데모 가상 데이터입니다.
               </p>
               <details>
                 <summary>
@@ -455,7 +455,7 @@ function App() {
                 <span className="dot" />
                 모니터 쇼핑 Agent
               </span>
-              <span>9개 상품 · 근거 기반 비교</span>
+              <span>9개 상품 · 판매 정보는 가상 데이터</span>
             </div>
             <div className="conversation" aria-live="polite">
               {messages.length === 0 ? (

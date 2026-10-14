@@ -2,9 +2,22 @@
   {
     "type": "function",
     "name": "get_search_guide",
-    "description": "객관 필터·체감 탐색 순서·선택자·집계 지표·데이터 버전·답변 정책을 반환한다.\n    대화 시작 시 한 번 호출해 두면 이후 검색 조건을 정확히 만들 수 있다.",
+    "description": "카테고리·동적 필터 키/연산자·관측값과 답변 정책을 확인한다.",
     "parameters": {
-      "properties": {},
+      "properties": {
+        "category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Category"
+        }
+      },
       "title": "get_search_guideArguments",
       "type": "object"
     },
@@ -13,116 +26,26 @@
   {
     "type": "function",
     "name": "search_products",
-    "description": "객관 조건과 체감 리뷰 조건을 AND로 결합해 검색하고 체감 점수로 정렬한다. 모든 조건을 매번 전달한다.\n\n    결과에는 applied_conditions(타입·조건·적용 내용 JSON), 일치 상품, 문서 미기재로 판정 불가했던 상품,\n    0건일 때의 relaxation_suggestions(제거/완화할 조건 제안)가 들어 있다. null 은 '미지원'이 아니라 '문서 미기재'다.",
+    "description": "전체 조건을 받아 객관·판매·리뷰로 필터하고 정렬한다. applied_filters_markdown을 답변 앞에 그대로 표시한다.",
     "parameters": {
       "$defs": {
-        "AttributeClause": {
-          "additionalProperties": false,
-          "properties": {
-            "aspect_cluster_id": {
-              "description": "속성 군집 ID",
-              "minLength": 1,
-              "title": "Aspect Cluster Id",
-              "type": "string"
-            },
-            "raw_aspect_ids": {
-              "anyOf": [
-                {
-                  "items": {
-                    "type": "string"
-                  },
-                  "minItems": 1,
-                  "type": "array"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "원래 속성 ID 목록. 생략하면 군집 전체",
-              "title": "Raw Aspect Ids"
-            }
-          },
-          "required": [
-            "aspect_cluster_id"
-          ],
-          "title": "AttributeClause",
-          "type": "object"
-        },
-        "AttributeSelector": {
-          "additionalProperties": false,
-          "properties": {
-            "clauses": {
-              "description": "OR로 결합할 속성 선택 절",
-              "items": {
-                "$ref": "#/$defs/AttributeClause"
-              },
-              "minItems": 1,
-              "title": "Clauses",
-              "type": "array"
-            }
-          },
-          "required": [
-            "clauses"
-          ],
-          "title": "AttributeSelector",
-          "type": "object"
-        },
-        "EvidenceTopic": {
-          "additionalProperties": false,
-          "properties": {
-            "topic_id": {
-              "minLength": 1,
-              "title": "Topic Id",
-              "type": "string"
-            },
-            "attribute": {
-              "$ref": "#/$defs/AttributeSelector"
-            },
-            "desired_state_ids": {
-              "anyOf": [
-                {
-                  "items": {
-                    "type": "string"
-                  },
-                  "minItems": 1,
-                  "type": "array"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Desired State Ids"
-            },
-            "contrary_state_ids": {
-              "items": {
-                "type": "string"
-              },
-              "title": "Contrary State Ids",
-              "type": "array"
-            }
-          },
-          "required": [
-            "topic_id",
-            "attribute"
-          ],
-          "title": "EvidenceTopic",
-          "type": "object"
-        },
         "ExperienceCondition": {
           "additionalProperties": false,
           "properties": {
             "condition_id": {
-              "description": "호출 안에서 유일한 조건 ID",
               "minLength": 1,
               "title": "Condition Id",
               "type": "string"
             },
-            "attribute": {
-              "$ref": "#/$defs/AttributeSelector"
+            "aspect_variant_ids": {
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "title": "Aspect Variant Ids",
+              "type": "array"
             },
-            "desired_state_ids": {
+            "desired_state_variant_ids": {
               "anyOf": [
                 {
                   "items": {
@@ -136,15 +59,13 @@
                 }
               ],
               "default": null,
-              "description": "원하는 원래 상태 ID. 생략하면 상태 제한 없음",
-              "title": "Desired State Ids"
+              "title": "Desired State Variant Ids"
             },
-            "contrary_state_ids": {
-              "description": "명시적으로 지정한 상반 상태 ID",
+            "contrary_state_variant_ids": {
               "items": {
                 "type": "string"
               },
-              "title": "Contrary State Ids",
+              "title": "Contrary State Variant Ids",
               "type": "array"
             },
             "sentiments": {
@@ -168,12 +89,10 @@
                 }
               ],
               "default": null,
-              "description": "일치 상태의 리뷰별 감성 제한",
               "title": "Sentiments"
             },
             "min_matching_reviews": {
               "default": 1,
-              "description": "최소 일치 리뷰 수",
               "minimum": 1,
               "title": "Min Matching Reviews",
               "type": "integer"
@@ -189,33 +108,33 @@
                 }
               ],
               "default": null,
-              "description": "상반 리뷰 수 상한. 기본은 제한 없음",
               "title": "Max Contrary Reviews"
             }
           },
           "required": [
             "condition_id",
-            "attribute"
+            "aspect_variant_ids"
           ],
           "title": "ExperienceCondition",
           "type": "object"
         },
-        "ExperienceSort": {
+        "ExperienceTopic": {
           "additionalProperties": false,
           "properties": {
-            "attribute": {
-              "$ref": "#/$defs/AttributeSelector"
-            },
-            "metric": {
-              "default": "positive_wilson_lower",
-              "enum": [
-                "positive_wilson_lower",
-                "state_wilson_lower"
-              ],
-              "title": "Metric",
+            "topic_id": {
+              "minLength": 1,
+              "title": "Topic Id",
               "type": "string"
             },
-            "desired_state_ids": {
+            "aspect_variant_ids": {
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "title": "Aspect Variant Ids",
+              "type": "array"
+            },
+            "desired_state_variant_ids": {
               "anyOf": [
                 {
                   "items": {
@@ -229,44 +148,250 @@
                 }
               ],
               "default": null,
-              "description": "상태 점수에 사용할 원래 상태 ID",
-              "title": "Desired State Ids"
+              "title": "Desired State Variant Ids"
             },
-            "order": {
-              "default": "desc",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "title": "Order",
-              "type": "string"
+            "contrary_state_variant_ids": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Contrary State Variant Ids",
+              "type": "array"
             }
           },
           "required": [
-            "attribute"
+            "topic_id",
+            "aspect_variant_ids"
           ],
-          "title": "ExperienceSort",
+          "title": "ExperienceTopic",
+          "type": "object"
+        },
+        "ObjectiveFilter": {
+          "additionalProperties": false,
+          "properties": {
+            "key": {
+              "title": "Key",
+              "type": "string"
+            },
+            "op": {
+              "enum": [
+                "eq",
+                "ne",
+                "in",
+                "not_in",
+                "gte",
+                "lte",
+                "between",
+                "contains_any",
+                "contains_all",
+                "exists"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "value": {
+              "default": null,
+              "title": "Value"
+            }
+          },
+          "required": [
+            "key",
+            "op"
+          ],
+          "title": "ObjectiveFilter",
+          "type": "object"
+        },
+        "OfferFilter": {
+          "additionalProperties": false,
+          "properties": {
+            "max_price": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Max Price"
+            },
+            "min_price": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Min Price"
+            },
+            "currency": {
+              "default": "KRW",
+              "pattern": "^[A-Z]{3}$",
+              "title": "Currency",
+              "type": "string"
+            },
+            "availability": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "available",
+                      "sold_out",
+                      "discontinued",
+                      "unknown"
+                    ],
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Availability"
+            },
+            "max_shipping_fee": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Max Shipping Fee"
+            },
+            "max_shipping_days": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Max Shipping Days"
+            },
+            "retailers": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Retailers"
+            }
+          },
+          "title": "OfferFilter",
+          "type": "object"
+        },
+        "SortSpec": {
+          "additionalProperties": false,
+          "properties": {
+            "by": {
+              "default": "price",
+              "enum": [
+                "price",
+                "attribute",
+                "experience"
+              ],
+              "title": "By",
+              "type": "string"
+            },
+            "key": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Key"
+            },
+            "aspect_variant_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Aspect Variant Ids"
+            },
+            "metric": {
+              "default": "positive_wilson_lower",
+              "enum": [
+                "positive_wilson_lower",
+                "state_wilson_lower"
+              ],
+              "title": "Metric",
+              "type": "string"
+            },
+            "desired_state_variant_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Desired State Variant Ids"
+            },
+            "order": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Order"
+            }
+          },
+          "title": "SortSpec",
           "type": "object"
         }
       },
       "properties": {
-        "brands": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "브랜드: AOC, BenQ, LG, Samsung (삼성/오디세이 별칭 허용)",
-          "title": "Brands"
-        },
-        "name_contains": {
+        "category": {
           "anyOf": [
             {
               "type": "string"
@@ -276,484 +401,58 @@
             }
           ],
           "default": null,
-          "description": "이름/모델/시리즈 부분 일치. 예: 'G5', 'Q27'",
-          "title": "Name Contains"
+          "title": "Category"
         },
-        "size_classes": {
+        "filters": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ObjectiveFilter"
+          },
+          "title": "Filters",
+          "type": "array"
+        },
+        "offer_filter": {
           "anyOf": [
             {
-              "items": {
-                "type": "integer"
-              },
-              "type": "array"
+              "$ref": "#/$defs/OfferFilter"
             },
             {
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "판매 분류 크기(형) 목록. 24/27/32/34. 31.5형과 32형은 모두 32",
-          "title": "Size Classes"
+          "default": null
         },
-        "min_size_class": {
+        "experience_conditions": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ExperienceCondition"
+          },
+          "title": "Experience Conditions",
+          "type": "array"
+        },
+        "sort": {
           "anyOf": [
             {
-              "type": "integer"
+              "$ref": "#/$defs/SortSpec"
             },
             {
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "판매 분류 크기 하한(형), 예: 27 -> 27형 이상",
-          "title": "Min Size Class"
+          "default": null
         },
-        "max_size_class": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "판매 분류 크기 상한(형)",
-          "title": "Max Size Class"
-        },
-        "min_price_krw": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "대표가 하한(원)",
-          "title": "Min Price Krw"
-        },
-        "max_price_krw": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "대표가 상한(원). 대표가 기준은 상품마다 다름(price_basis)",
-          "title": "Max Price Krw"
-        },
-        "availability": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "판매상태 허용 목록: on_sale | temporarily_out_of_stock | discontinued | unknown(미기재). 단종 제외하려면 나머지 셋 지정",
-          "title": "Availability"
-        },
-        "resolution_classes": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "해상도 등급 목록: FHD(1920x1080), QHD(2560x1440), UWQHD(3440x1440), UHD(3840x2160). 4K=UHD",
-          "title": "Resolution Classes"
-        },
-        "min_resolution": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "화소 수 기준 최소 해상도 등급. FHD<QHD<UWQHD<UHD",
-          "title": "Min Resolution"
-        },
-        "aspect_ratio": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "'16:9' 또는 '21:9'(울트라와이드)",
-          "title": "Aspect Ratio"
-        },
-        "panel_types": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "패널 종류: IPS, VA",
-          "title": "Panel Types"
-        },
-        "panel_shape": {
-          "anyOf": [
-            {
-              "enum": [
-                "flat",
-                "curved"
-              ],
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "flat(평면) | curved(커브드)",
-          "title": "Panel Shape"
-        },
-        "min_refresh_hz": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "최대 주사율 하한(Hz)",
-          "title": "Min Refresh Hz"
-        },
-        "max_response_ms": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "응답속도 상한(ms). 반드시 response_method 와 함께 지정",
-          "title": "Max Response Ms"
-        },
-        "response_method": {
-          "anyOf": [
-            {
-              "enum": [
-                "GTG",
-                "MPRT"
-              ],
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "응답속도 측정 방식. GTG 와 MPRT 는 서로 비교 불가",
-          "title": "Response Method"
-        },
-        "min_brightness_nits": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "표준 밝기 하한(nits)",
-          "title": "Min Brightness Nits"
-        },
-        "min_contrast_ratio": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "정적 명암비 하한. 예: 3000 -> 3000:1 이상",
-          "title": "Min Contrast Ratio"
-        },
-        "min_color_bit_depth": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "색 심도 하한(8 또는 10). 10은 1.07B색(8bit+FRC)",
-          "title": "Min Color Bit Depth"
-        },
-        "sync": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "가변 주사율: freesync | freesync_premium | gsync_compatible",
-          "title": "Sync"
-        },
-        "min_hdmi_count": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "HDMI 포트 수 하한",
-          "title": "Min Hdmi Count"
-        },
-        "min_hdmi_version": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "HDMI 최고 버전 하한. 예: 2.0",
-          "title": "Min Hdmi Version"
-        },
-        "min_dp_count": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "DisplayPort 포트 수 하한",
-          "title": "Min Dp Count"
-        },
-        "require_dsub": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "true 이면 D-Sub(VGA) 단자 필요",
-          "title": "Require Dsub"
-        },
-        "require_headphone_out": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "true 이면 헤드폰 출력 단자 필요",
-          "title": "Require Headphone Out"
-        },
-        "max_weight_kg": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "스탠드 포함 무게 상한(kg)",
-          "title": "Max Weight Kg"
-        },
-        "max_width_mm": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "스탠드 포함 폭 상한(mm)",
-          "title": "Max Width Mm"
-        },
-        "max_height_mm": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "스탠드 포함 높이(최저 높이 기준) 상한(mm)",
-          "title": "Max Height Mm"
-        },
-        "max_depth_mm": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "스탠드 포함 깊이 상한(mm)",
-          "title": "Max Depth Mm"
-        },
-        "vesa_mm": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "integer"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "VESA 규격 목록: 75, 100",
-          "title": "Vesa Mm"
-        },
-        "max_power_w": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "최대 소비전력 상한(W). 문서 미기재 상품은 판정 불가로 분리됨",
-          "title": "Max Power W"
-        },
-        "min_release_year": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "출시 연도 하한",
-          "title": "Min Release Year"
-        },
-        "max_release_year": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "출시 연도 상한",
-          "title": "Max Release Year"
-        },
-        "require_features": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "문서에 '지원'으로 확인된 기능만 통과. 키 목록은 get_search_guide 의 require_features 참고. 예: hdr10, built_in_speaker, pbp, crosshair, low_input_lag, black_equalizer, zero_bright_dot_policy, height_adjust, swivel, pivot, flicker_free, blue_light_filter, pip, gsync_compatible",
-          "title": "Require Features"
-        },
-        "sort_by": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "정렬 기준. price(기본) | refresh_rate | resolution | size | weight | ppi | brightness | contrast | release | response_gtg | response_mprt | price_per_megapixel | power",
-          "title": "Sort By"
-        },
-        "sort_order": {
-          "anyOf": [
-            {
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "정렬 방향. 생략하면 기준별 기본값(가격 오름차순 등)",
-          "title": "Sort Order"
+        "evidence_topics": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ExperienceTopic"
+          },
+          "title": "Evidence Topics",
+          "type": "array"
         },
         "limit": {
           "anyOf": [
             {
+              "minimum": 1,
               "type": "integer"
             },
             {
@@ -761,7 +460,6 @@
             }
           ],
           "default": null,
-          "description": "표시할 최대 개수(기본 전체)",
           "title": "Limit"
         },
         "user_request": {
@@ -774,68 +472,15 @@
             }
           ],
           "default": null,
-          "description": "사용자 요청 원문. 조건 블록에 함께 표시된다",
           "title": "User Request"
         },
         "interpretation_notes": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "모호한 표현을 수치로 해석한 가정. 예: ['가벼운 -> 5kg 이하로 해석']. 조건 블록에 표시된다",
-          "title": "Interpretation Notes"
-        },
-        "experience_conditions": {
-          "anyOf": [
-            {
-              "items": {
-                "$ref": "#/$defs/ExperienceCondition"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "필수 체감 조건. 속성·원래 상태 ID는 탐색 도구로 확인. 기본은 일치 리뷰 1개 이상, 상반 리뷰도 공개",
-          "title": "Experience Conditions"
-        },
-        "experience_sort": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ExperienceSort"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "체감 정렬. 선택 속성의 전체 관련 리뷰를 분모로 한 Wilson 하한. 동점은 기존 객관 정렬"
-        },
-        "evidence_topics": {
-          "anyOf": [
-            {
-              "items": {
-                "$ref": "#/$defs/EvidenceTopic"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "상품별 답변에 사용할 체감 토픽과 상태·상반 근거",
-          "title": "Evidence Topics"
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Interpretation Notes",
+          "type": "array"
         }
       },
       "title": "search_productsArguments",
@@ -846,62 +491,10 @@
   {
     "type": "function",
     "name": "compare_products",
-    "description": "상품 2개 이상을 가격·화면·성능·단자·물리·기능 항목별로 나란히 비교하고 차이가 나는 항목을 표시한다.",
+    "description": "같은 카테고리의 2~5개 상품을 객관 속성·판매 요약·체감 토픽으로 비교한다.",
     "parameters": {
       "$defs": {
-        "AttributeClause": {
-          "additionalProperties": false,
-          "properties": {
-            "aspect_cluster_id": {
-              "description": "속성 군집 ID",
-              "minLength": 1,
-              "title": "Aspect Cluster Id",
-              "type": "string"
-            },
-            "raw_aspect_ids": {
-              "anyOf": [
-                {
-                  "items": {
-                    "type": "string"
-                  },
-                  "minItems": 1,
-                  "type": "array"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "원래 속성 ID 목록. 생략하면 군집 전체",
-              "title": "Raw Aspect Ids"
-            }
-          },
-          "required": [
-            "aspect_cluster_id"
-          ],
-          "title": "AttributeClause",
-          "type": "object"
-        },
-        "AttributeSelector": {
-          "additionalProperties": false,
-          "properties": {
-            "clauses": {
-              "description": "OR로 결합할 속성 선택 절",
-              "items": {
-                "$ref": "#/$defs/AttributeClause"
-              },
-              "minItems": 1,
-              "title": "Clauses",
-              "type": "array"
-            }
-          },
-          "required": [
-            "clauses"
-          ],
-          "title": "AttributeSelector",
-          "type": "object"
-        },
-        "EvidenceTopic": {
+        "ExperienceTopic": {
           "additionalProperties": false,
           "properties": {
             "topic_id": {
@@ -909,10 +502,15 @@
               "title": "Topic Id",
               "type": "string"
             },
-            "attribute": {
-              "$ref": "#/$defs/AttributeSelector"
+            "aspect_variant_ids": {
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "title": "Aspect Variant Ids",
+              "type": "array"
             },
-            "desired_state_ids": {
+            "desired_state_variant_ids": {
               "anyOf": [
                 {
                   "items": {
@@ -926,39 +524,39 @@
                 }
               ],
               "default": null,
-              "title": "Desired State Ids"
+              "title": "Desired State Variant Ids"
             },
-            "contrary_state_ids": {
+            "contrary_state_variant_ids": {
               "items": {
                 "type": "string"
               },
-              "title": "Contrary State Ids",
+              "title": "Contrary State Variant Ids",
               "type": "array"
             }
           },
           "required": [
             "topic_id",
-            "attribute"
+            "aspect_variant_ids"
           ],
-          "title": "EvidenceTopic",
+          "title": "ExperienceTopic",
           "type": "object"
         }
       },
       "properties": {
-        "products": {
-          "description": "비교할 상품 2개 이상. product_id 또는 모델명. 예: ['lg-32qn650', 'U32J590']",
+        "product_ids": {
           "items": {
-            "type": "string"
+            "type": "integer"
           },
+          "maxItems": 5,
           "minItems": 2,
-          "title": "Products",
+          "title": "Product Ids",
           "type": "array"
         },
-        "experience_topics": {
+        "attribute_keys": {
           "anyOf": [
             {
               "items": {
-                "$ref": "#/$defs/EvidenceTopic"
+                "type": "string"
               },
               "type": "array"
             },
@@ -967,12 +565,19 @@
             }
           ],
           "default": null,
-          "description": "동일 분모 정의로 비교할 체감 속성과 상태",
-          "title": "Experience Topics"
+          "title": "Attribute Keys"
+        },
+        "experience_topics": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ExperienceTopic"
+          },
+          "title": "Experience Topics",
+          "type": "array"
         }
       },
       "required": [
-        "products"
+        "product_ids"
       ],
       "title": "compare_productsArguments",
       "type": "object"
@@ -982,62 +587,10 @@
   {
     "type": "function",
     "name": "get_product_details",
-    "description": "상품 1개의 DB 핵심 속성(기능 근거 포함)과 상세 문서(markdown) 전문을 반환한다. 시야각·보증·구성품·스탠드 각도 등 세부 질문에 사용한다.",
+    "description": "상품의 전체 객관 속성·상세 Markdown·판매처·주요 리뷰 속성을 반환한다.",
     "parameters": {
       "$defs": {
-        "AttributeClause": {
-          "additionalProperties": false,
-          "properties": {
-            "aspect_cluster_id": {
-              "description": "속성 군집 ID",
-              "minLength": 1,
-              "title": "Aspect Cluster Id",
-              "type": "string"
-            },
-            "raw_aspect_ids": {
-              "anyOf": [
-                {
-                  "items": {
-                    "type": "string"
-                  },
-                  "minItems": 1,
-                  "type": "array"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "원래 속성 ID 목록. 생략하면 군집 전체",
-              "title": "Raw Aspect Ids"
-            }
-          },
-          "required": [
-            "aspect_cluster_id"
-          ],
-          "title": "AttributeClause",
-          "type": "object"
-        },
-        "AttributeSelector": {
-          "additionalProperties": false,
-          "properties": {
-            "clauses": {
-              "description": "OR로 결합할 속성 선택 절",
-              "items": {
-                "$ref": "#/$defs/AttributeClause"
-              },
-              "minItems": 1,
-              "title": "Clauses",
-              "type": "array"
-            }
-          },
-          "required": [
-            "clauses"
-          ],
-          "title": "AttributeSelector",
-          "type": "object"
-        },
-        "EvidenceTopic": {
+        "ExperienceTopic": {
           "additionalProperties": false,
           "properties": {
             "topic_id": {
@@ -1045,10 +598,15 @@
               "title": "Topic Id",
               "type": "string"
             },
-            "attribute": {
-              "$ref": "#/$defs/AttributeSelector"
+            "aspect_variant_ids": {
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "title": "Aspect Variant Ids",
+              "type": "array"
             },
-            "desired_state_ids": {
+            "desired_state_variant_ids": {
               "anyOf": [
                 {
                   "items": {
@@ -1062,49 +620,40 @@
                 }
               ],
               "default": null,
-              "title": "Desired State Ids"
+              "title": "Desired State Variant Ids"
             },
-            "contrary_state_ids": {
+            "contrary_state_variant_ids": {
               "items": {
                 "type": "string"
               },
-              "title": "Contrary State Ids",
+              "title": "Contrary State Variant Ids",
               "type": "array"
             }
           },
           "required": [
             "topic_id",
-            "attribute"
+            "aspect_variant_ids"
           ],
-          "title": "EvidenceTopic",
+          "title": "ExperienceTopic",
           "type": "object"
         }
       },
       "properties": {
-        "product": {
-          "description": "product_id 또는 모델명. 예: 'aoc-q27g2s', 'GW2780'",
-          "title": "Product",
-          "type": "string"
+        "product_id": {
+          "title": "Product Id",
+          "type": "integer"
         },
         "experience_topics": {
-          "anyOf": [
-            {
-              "items": {
-                "$ref": "#/$defs/EvidenceTopic"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "집계와 원문 근거를 추가할 체감 토픽",
-          "title": "Experience Topics"
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ExperienceTopic"
+          },
+          "title": "Experience Topics",
+          "type": "array"
         }
       },
       "required": [
-        "product"
+        "product_id"
       ],
       "title": "get_product_detailsArguments",
       "type": "object"
@@ -1114,19 +663,18 @@
   {
     "type": "function",
     "name": "search_product_docs",
-    "description": "상품 상세 문서(markdown)에서 키워드를 찾아 줄 단위로 돌려준다. DB 검색 필드에 없는 세부 항목 확인용.",
+    "description": "상세 문서에서 공백/쉼표로 나눈 키워드가 있는 줄과 가장 가까운 앞 제목을 찾는다.",
     "parameters": {
       "properties": {
         "query": {
-          "description": "검색어(공백/쉼표 구분). 예: '시야각', '픽셀 보증', 'DP 케이블'",
           "title": "Query",
           "type": "string"
         },
-        "products": {
+        "product_ids": {
           "anyOf": [
             {
               "items": {
-                "type": "string"
+                "type": "integer"
               },
               "type": "array"
             },
@@ -1135,12 +683,22 @@
             }
           ],
           "default": null,
-          "description": "대상 상품 제한(생략 시 전체 9개)",
-          "title": "Products"
+          "title": "Product Ids"
+        },
+        "category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Category"
         },
         "max_results": {
           "default": 15,
-          "description": "최대 결과 줄 수",
           "maximum": 50,
           "minimum": 1,
           "title": "Max Results",
@@ -1158,18 +716,28 @@
   {
     "type": "function",
     "name": "find_review_attributes",
-    "description": "실험 D 전체 속성을 문자 검색한다. 후보의 원래 속성 ID와 군집 전체 선택자를 반환한다.\n    가성비가 퀄리티 군집에 포함돼도 원래 표현만 선택한다. 의미 확장은 대화 모델이 근거를 확인한다.",
+    "description": "리뷰 속성 표현을 문자 검색한다. matched_selector와 cluster_selector를 보고 범위를 직접 선택한다.",
     "parameters": {
       "properties": {
+        "category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Category"
+        },
         "query": {
           "default": "",
-          "description": "원래/정규화 속성 검색어. 빈 문자열은 전체 목록. 공백과 Unicode 표기 차이는 정규화",
           "title": "Query",
           "type": "string"
         },
         "limit": {
           "default": 20,
-          "description": "페이지 크기",
           "maximum": 100,
           "minimum": 1,
           "title": "Limit",
@@ -1177,7 +745,6 @@
         },
         "offset": {
           "default": 0,
-          "description": "페이지 시작 위치",
           "minimum": 0,
           "title": "Offset",
           "type": "integer"
@@ -1191,74 +758,23 @@
   {
     "type": "function",
     "name": "list_review_states",
-    "description": "선택 속성의 원래 상태 ID, 상품별 리뷰 수, 감성, 원문 샘플을 반환한다.\n    없음과 거의 없음은 별도 ID로 선택한다. NULL 상태는 없음으로 취급하지 않는다.",
+    "description": "선택한 원래 aspect 표현의 상태 ID·리뷰 수·감성 분포·예시를 조회한다.",
     "parameters": {
-      "$defs": {
-        "AttributeClause": {
-          "additionalProperties": false,
-          "properties": {
-            "aspect_cluster_id": {
-              "description": "속성 군집 ID",
-              "minLength": 1,
-              "title": "Aspect Cluster Id",
-              "type": "string"
-            },
-            "raw_aspect_ids": {
-              "anyOf": [
-                {
-                  "items": {
-                    "type": "string"
-                  },
-                  "minItems": 1,
-                  "type": "array"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "원래 속성 ID 목록. 생략하면 군집 전체",
-              "title": "Raw Aspect Ids"
-            }
-          },
-          "required": [
-            "aspect_cluster_id"
-          ],
-          "title": "AttributeClause",
-          "type": "object"
-        },
-        "AttributeSelector": {
-          "additionalProperties": false,
-          "properties": {
-            "clauses": {
-              "description": "OR로 결합할 속성 선택 절",
-              "items": {
-                "$ref": "#/$defs/AttributeClause"
-              },
-              "minItems": 1,
-              "title": "Clauses",
-              "type": "array"
-            }
-          },
-          "required": [
-            "clauses"
-          ],
-          "title": "AttributeSelector",
-          "type": "object"
-        }
-      },
       "properties": {
-        "attribute": {
-          "$ref": "#/$defs/AttributeSelector",
-          "description": "find_review_attributes로 확인한 속성 선택자"
+        "aspect_variant_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Aspect Variant Ids",
+          "type": "array"
         },
-        "products": {
+        "product_ids": {
           "anyOf": [
             {
               "items": {
-                "type": "string"
+                "type": "integer"
               },
-              "minItems": 1,
               "type": "array"
             },
             {
@@ -1266,12 +782,10 @@
             }
           ],
           "default": null,
-          "description": "상품 ID/모델명 제한. 생략하면 전체",
-          "title": "Products"
+          "title": "Product Ids"
         },
         "query": {
           "default": "",
-          "description": "원래 상태/정규화 상태의 문자 검색. 빈 문자열은 전체 상태",
           "title": "Query",
           "type": "string"
         },
@@ -1290,7 +804,7 @@
         }
       },
       "required": [
-        "attribute"
+        "aspect_variant_ids"
       ],
       "title": "list_review_statesArguments",
       "type": "object"
@@ -1300,121 +814,55 @@
   {
     "type": "function",
     "name": "get_review_evidence",
-    "description": "리뷰 단위로 원문 발췌, Unit ID, 원래/정규화 표현을 반환한다.\n    같은 리뷰에 원하는 상태와 상반 상태가 있으면 양쪽 라벨을 보존한다. 제품 특성을 보장하지 않는다.",
+    "description": "일치·상반·기타·상태 미기재 리뷰의 원문 근거를 확인한다. 한 리뷰에 여러 라벨을 허용한다.",
     "parameters": {
-      "$defs": {
-        "AttributeClause": {
-          "additionalProperties": false,
-          "properties": {
-            "aspect_cluster_id": {
-              "description": "속성 군집 ID",
-              "minLength": 1,
-              "title": "Aspect Cluster Id",
-              "type": "string"
-            },
-            "raw_aspect_ids": {
-              "anyOf": [
-                {
-                  "items": {
-                    "type": "string"
-                  },
-                  "minItems": 1,
-                  "type": "array"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "원래 속성 ID 목록. 생략하면 군집 전체",
-              "title": "Raw Aspect Ids"
-            }
-          },
-          "required": [
-            "aspect_cluster_id"
-          ],
-          "title": "AttributeClause",
-          "type": "object"
-        },
-        "AttributeSelector": {
-          "additionalProperties": false,
-          "properties": {
-            "clauses": {
-              "description": "OR로 결합할 속성 선택 절",
-              "items": {
-                "$ref": "#/$defs/AttributeClause"
-              },
-              "minItems": 1,
-              "title": "Clauses",
-              "type": "array"
-            }
-          },
-          "required": [
-            "clauses"
-          ],
-          "title": "AttributeSelector",
-          "type": "object"
-        }
-      },
       "properties": {
-        "attribute": {
-          "$ref": "#/$defs/AttributeSelector",
-          "description": "근거를 조회할 속성 선택자"
-        },
-        "products": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "string"
-              },
-              "minItems": 1,
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Products"
-        },
-        "desired_state_ids": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "string"
-              },
-              "minItems": 1,
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "원하는 원래 상태 ID. 생략하면 상태 제한 없음",
-          "title": "Desired State Ids"
-        },
-        "contrary_state_ids": {
-          "default": [],
-          "description": "상반된 원래 상태 ID. 생략하면 상반 수는 미평가",
+        "aspect_variant_ids": {
           "items": {
             "type": "string"
           },
-          "title": "Contrary State Ids",
+          "minItems": 1,
+          "title": "Aspect Variant Ids",
           "type": "array"
         },
-        "group": {
-          "default": "all",
-          "description": "원문 근거 그룹",
-          "enum": [
-            "all",
-            "matching",
-            "contrary",
-            "other",
-            "unknown_state"
+        "desired_state_variant_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
           ],
-          "title": "Group",
-          "type": "string"
+          "default": null,
+          "title": "Desired State Variant Ids"
+        },
+        "contrary_state_variant_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Contrary State Variant Ids",
+          "type": "array"
+        },
+        "product_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Product Ids"
         },
         "sentiments": {
           "anyOf": [
@@ -1439,6 +887,23 @@
           "default": null,
           "title": "Sentiments"
         },
+        "group": {
+          "default": "all",
+          "enum": [
+            "all",
+            "matching",
+            "contrary",
+            "other",
+            "unknown_state"
+          ],
+          "title": "Group",
+          "type": "string"
+        },
+        "include_full_review": {
+          "default": false,
+          "title": "Include Full Review",
+          "type": "boolean"
+        },
         "limit": {
           "default": 10,
           "maximum": 100,
@@ -1451,18 +916,57 @@
           "minimum": 0,
           "title": "Offset",
           "type": "integer"
-        },
-        "include_full_review": {
-          "default": false,
-          "description": "리뷰 전문 포함 여부",
-          "title": "Include Full Review",
-          "type": "boolean"
         }
       },
       "required": [
-        "attribute"
+        "aspect_variant_ids"
       ],
       "title": "get_review_evidenceArguments",
+      "type": "object"
+    },
+    "strict": false
+  },
+  {
+    "type": "function",
+    "name": "get_offers",
+    "description": "판매처별 가격·배송·재고·확인 시각을 반환한다. 판매 정보는 확인 시점의 스냅샷이다.",
+    "parameters": {
+      "properties": {
+        "product_ids": {
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 1,
+          "title": "Product Ids",
+          "type": "array"
+        },
+        "availability": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "available",
+                  "sold_out",
+                  "discontinued",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Availability"
+        }
+      },
+      "required": [
+        "product_ids"
+      ],
+      "title": "get_offersArguments",
       "type": "object"
     },
     "strict": false

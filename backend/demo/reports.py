@@ -1,9 +1,10 @@
 """Deterministic report calculations over the frozen catalog, with ephemeral input."""
 
 import math
-import unicodedata
 from collections import defaultdict
 from functools import lru_cache
+
+from vendor.meta_search.textnorm import make_id
 
 from . import catalog
 
@@ -48,7 +49,7 @@ def distribution(labels):
 def base():
     products = {p["product_id"]: p for p in catalog.products()}
     units = catalog.rows(
-        "SELECT u.*,r.product_id FROM opinion_units u JOIN reviews r ON u.review_idx=r.review_id ORDER BY u.idx"
+        "SELECT u.*,u.unit_id AS idx,u.review_id AS review_idx,u.aspect_variant_id AS raw_aspect_id FROM opinion_units u ORDER BY u.unit_id"
     )
 
     def aggregate(fields):
@@ -137,41 +138,37 @@ def base():
 
 def normalize(units):
     result = []
+    category = catalog.metadata()["category"]
     for unit in units:
         item = dict(unit)
-        aid = None
-        sid = None
-        raw_aid = None
-        raw_sid = None
-        aspect = None
-        status = None
-        raw = unicodedata.normalize("NFC", unit["raw_aspect"])
-        candidates = catalog.rows(
-            "SELECT DISTINCT v.raw_aspect_id,a.aspect_cluster_id,a.aspect FROM aspect_variants v JOIN aspects a USING(aspect_cluster_id) WHERE v.raw_aspect=?",
-            (raw,),
+        raw_aid = make_id("av", category, unit["raw_aspect"])
+        matches = catalog.rows(
+            "SELECT DISTINCT u.aspect_cluster_id,a.label FROM opinion_units u LEFT JOIN aspect_clusters a USING(aspect_cluster_id) WHERE u.aspect_variant_id=?",
+            (raw_aid,),
         )
+        aid = matches[0]["aspect_cluster_id"] if len(matches) == 1 else None
+        aspect = matches[0]["label"] if len(matches) == 1 else None
+        sid = status = raw_sid = None
         state = "unresolved_aspect"
-        if raw == "전반적 상품 경험":
+        if unit["raw_aspect"] == "전반적 상품 경험":
             state = "excluded"
-        elif len(candidates) == 1:
-            aid = candidates[0]["aspect_cluster_id"]
-            raw_aid = candidates[0]["raw_aspect_id"]
-            aspect = candidates[0]["aspect"]
+        elif matches:
             state = (
                 "mapped_exact" if unit["raw_status"] is None else "unresolved_status"
             )
             if unit["raw_status"] is not None:
-                candidates = catalog.rows(
-                    "SELECT DISTINCT v.state_variant_id,s.status_cluster_id,s.status FROM state_variants v JOIN states s USING(status_cluster_id) WHERE v.aspect_cluster_id=? AND v.raw_status=?",
-                    (aid, unicodedata.normalize("NFC", unit["raw_status"])),
+                candidate = make_id("sv", category, unit["raw_status"])
+                states = catalog.rows(
+                    "SELECT DISTINCT u.state_cluster_id,s.label FROM opinion_units u LEFT JOIN state_clusters s USING(state_cluster_id) WHERE u.aspect_variant_id=? AND u.state_variant_id=?",
+                    (raw_aid, candidate),
                 )
-                if len(candidates) == 1:
-                    sid = candidates[0]["status_cluster_id"]
-                    raw_sid = candidates[0]["state_variant_id"]
-                    status = candidates[0]["status"]
+                if states:
+                    raw_sid = candidate
                     state = "mapped_exact"
+                    if len(states) == 1:
+                        sid, status = states[0]["state_cluster_id"], states[0]["label"]
         item.update(
-            raw_aspect_id=raw_aid,
+            raw_aspect_id=raw_aid if matches else None,
             state_variant_id=raw_sid,
             aspect_id=aid,
             status_id=sid,
@@ -253,6 +250,7 @@ def alternatives(pid, conditions, static=False):
 
 
 def generate(pid, review, raw_units):
+    pid = catalog.resolve_product_id(pid)
     products, aspects, pairs, similarities = base()
     if pid not in products:
         raise ValueError("등록된 상품이 아닙니다.")
@@ -499,6 +497,6 @@ def render(report):
         "- 정확 일치하지 않은 표현은 비교에서 제외합니다. 미해결은 상품이 조건을 충족하지 않는다는 뜻이 아닙니다.",
         "- 유사도는 속성 언급과 감성 분포로 계산합니다. 대안 점수는 유사도 25%와 조건별 효용 75%를 결합합니다.",
         "- 정규 군집의 대표명에는 의미 혼합이 있을 수 있어 계산에 사용하지 않습니다. 원래 표현도 추출 오류와 표본 편향이 있을 수 있으며, 동의어가 자동 합산되지 않습니다.",
-        "- 가격·판매 상태는 고정된 과거 자료이며 현재 구매 가능 여부를 보장하지 않습니다.",
+        "- 판매처·가격·배송·재고·링크는 별도 데모 가상 데이터이며 실제 구매 정보가 아닙니다. 상세 문서의 과거 정보와 구분합니다.",
     ]
     return "\n".join(lines)
