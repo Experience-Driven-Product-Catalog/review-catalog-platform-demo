@@ -48,6 +48,10 @@ for t in TOOLS:
 def conditions(args, markdown):
     """Display only active objective/experience/sales operations, without request/result rows."""
     items = []
+    definitions = {
+        r["key"]: r["display_name"]
+        for r in catalog.rows("SELECT key,display_name FROM category_attributes")
+    }
     sale = args.get("offer_filter") or {}
     sale_active = any(
         sale.get(key) is not None and sale.get(key) != []
@@ -64,6 +68,22 @@ def conditions(args, markdown):
         if not line.startswith("- ") or ": " not in line:
             continue
         label, value = line[2:].split(": ", 1)
+        if label == "객관":
+            for key in definitions:
+                value = value.replace("(" + key + ")", "")
+        elif label == "체감" and " = " in value:
+            value = value.split(" = ", 1)[1]
+        elif label == "판매":
+            for raw, text in {
+                "available": "판매 중",
+                "sold_out": "품절",
+                "discontinued": "단종",
+                "unknown": "미확인",
+            }.items():
+                value = value.replace(raw, text)
+        elif label == "정렬" and (args.get("sort") or {}).get("by") == "attribute":
+            key = args["sort"]["key"]
+            value = value.replace(key, definitions.get(key, key), 1)
         active = (
             (label == "객관" and bool(args.get("filters")))
             or (label == "판매" and sale_active)

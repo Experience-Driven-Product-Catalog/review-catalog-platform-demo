@@ -186,6 +186,7 @@ def test_condition_cards_hide_unrestricted_and_non_attribute_rows():
         for c in cards
     )
     assert not any("27형을 찾고 싶어요" in c["value"] for c in cards)
+    assert "size_class" not in cards[0]["value"]
     assert "배송비" in cards[1]["value"]
     assert "내림차순" in cards[2]["value"]
 
